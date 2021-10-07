@@ -142,7 +142,7 @@ class FrameScore(ReferenceFreeMetric):
         self.include_premise = True
 
         logger.success("Initialized the {}-scorer: {}", frame_set, frame_classifier)
-        logger.debug("--> type: {}", self.scorer.model_type)
+        logger.debug("--> classifier type: {}", type(self.frame_classifier.model))
 
     def score_multi_all(self, summaries_list: List[List[SummaryType]], **kwargs) -> List[List[MetricsDict]]:
         metrics_lists = []

@@ -23,7 +23,7 @@ frame_datasets: List[Tuple[Optional[pathlib.Path], Tuple[str]]] = \
      (pathlib.Path("frame_sets", "frame_datasets", "Media-frames-immigrationsamesexsmoking.csv"),
       ("frame", "conclusion"))
      ]
-limit_samples: int = 111
+limit_samples: int = -1
 train_val_test_topic_distinct: bool = limit_samples < 0 or limit_samples >= 200
 max_length_premise: int = 128
 max_length_conclusion: int = 24
@@ -32,8 +32,8 @@ frame_set: Optional[str] = "media_frames"
 include_topic: bool = True
 
 # TRAINING parameters
-label_smoothing: Optional[float] = .1
-tdf_vocab_smoothing_factor: Optional[float] = .5
+label_smoothing: Optional[float] = None
+tdf_vocab_smoothing_factor: Optional[float] = None
 frame_vocab_smoothing_factor: Optional[float] = None
 tokenizer: transformers.PreTrainedTokenizer = transformers.T5Tokenizer.from_pretrained("t5-small", extra_ids=128)
 if frame_set is None:
@@ -56,8 +56,8 @@ cherry_pickers: List[Optional[CherryPicker]] = [
 preferred_model_for_frame_identifier = "distilroberta-base"
 
 # OTHER PARAMS
-log_level_console: str = "DEBUG"
-log_level_file: str = "TRACE"
+log_level_console: str = "INFO"
+log_level_file: str = "DEBUG"
 log_to_file: bool = True
 
 ########################################################################################################################
@@ -166,6 +166,10 @@ if __name__ == '__main__':
 
     if limit_samples >= 1:
         logger.info("You want to limit your samples to {}", limit_samples)
+        if limit_samples < 10:
+            logger.error("You want to limit your samples to only {}. That's too few - please consider >= 10!",
+                         limit_samples)
+            limit_samples = 10
         if limit_samples < len(df):
             df = df[-limit_samples:]
             last_df_size = min(last_df_size, limit_samples)

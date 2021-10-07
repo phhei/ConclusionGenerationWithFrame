@@ -32,10 +32,10 @@ class ClassificationDataset(Dataset):
             self.data: List[Tuple[torch.Tensor, int]] = data
         else:
             logger.trace("Tokenizer is given: {}", tokenizer)
-            self.data: List[Tuple[str, int]] = [(tokenizer(text, return_tensors="pt", padding="max_length",
-                                                           max_length=max_length)["input_ids"], label)
-                                                if isinstance(text, str) else (text, label)
-                                                for text, label in data]
+            self.data: List[Tuple[torch.Tensor, int]] = [(tokenizer(text, return_tensors="pt", padding="max_length",
+                                                                    max_length=max_length)["input_ids"], label)
+                                                         if isinstance(text, str) else (text, label)
+                                                         for text, label in data]
         logger.success("Initializes a dataset with {} samples", len(self.data))
 
 
@@ -151,6 +151,7 @@ class FrameClassifier:
 
             test_outputs.metrics["num_samples"] = len(test_dataset)
             try:
+                self.out_dir.mkdir(parents=True, exist_ok=True)
                 with self.out_dir.joinpath("metrics.txt").open(mode="w", encoding="utf-8") as stream:
                     pprint.pprint(object=test_outputs.metrics,
                                   stream=stream,
