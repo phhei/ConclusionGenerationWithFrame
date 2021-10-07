@@ -1,0 +1,15 @@
+ID,label,keywords_label,description
+0,economic,cost economics,"cost, benefits, or other financial implications"
+1,capacity and resources,capacity resources,"availability of physical, human or financial resources, and capacity of current systems"
+2,morality,religion moral,religious or ethical implications
+3,fairness and equality,fair equality,"balance or distribution of rights, responsibilities, and resources"
+4,"legality, constitutionality and jurisprudence",legality constitutionality jurisprudence,"rights, freedoms, and authority of individuals, corporations, and government"
+5,policy prescription and evaluation,policy effect,discussion of specific policies aimed at addressing problems
+6,crime and punishment,crime punishment,effectiveness and implications of laws and their enforcement
+7,security and defence,security defence,"threats to welfare of the individual, community, or nation"
+8,health and safety,health safe,"health care, sanitation, public safety"
+9,quality of life,happiness life,"threats and opportunities for the individuals heath, happiness, and well-being"
+10,cultural identity,culture,"traditions, customs, or values of a social group in relation to a policy issues"
+11,public opinion,public opinion,"attitudes and opinions of the general public, including polling and demographics"
+12,political,politics,"considerations related to politics and politicians, including lobbying, elections, and attempts to sway voters"
+13,external regulation and reputation,regulation reputation,internal reputation or foreign policy of the USA

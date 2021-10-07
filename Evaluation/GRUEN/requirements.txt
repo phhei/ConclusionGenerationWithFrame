@@ -1,0 +1,8 @@
+editdistance
+nltk
+numpy
+spacy
+torch
+tqdm
+transformers>=3.4.0
+#wmd==1.3.1
