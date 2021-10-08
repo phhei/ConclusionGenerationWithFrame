@@ -10,3 +10,4 @@
 /.pytest_cache/
 /.out/
 /venv/
+/token.txt

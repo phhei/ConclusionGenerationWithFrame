@@ -58,7 +58,7 @@ preferred_model_for_frame_identifier = "distilroberta-base"
 # OTHER PARAMS
 log_level_console: str = "INFO"
 log_level_file: str = "DEBUG"
-log_to_file: bool = True
+log_to_file: bool = False
 
 ########################################################################################################################
 ########################################################################################################################
@@ -67,7 +67,8 @@ log_to_file: bool = True
 logger.remove()
 logger.add(sink=sys.stdout, level=log_level_console, colorize=True)
 if log_to_file:
-    logger.add(sink="logs/main_{time}.log", level=log_level_file, colorize=False, rotation="12 MB")
+    logger.add(sink="logs/main_{time}.log", level=log_level_file, colorize=False, rotation="6 MB")
+
 
 def make_topic_distinct(split_1: pandas.DataFrame, split_2: pandas.DataFrame) -> pandas.DataFrame:
     topics_split1 = set(split_1["topic_id"].astype("str"))

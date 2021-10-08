@@ -232,7 +232,8 @@ class CherryPickerSelection(dict):
                                  ClaimLikeScore(), "ClaimLikeScore_summary", 5)
         self["BERTPicker"] = (BertScorePremConc(), "bertscorePremCon")
         self["FramePicker"] = () if frame_set is None else (FrameScore(frame_set=frame_set,
-                                                                       frame_classifier=frame_classifier))
+                                                                       frame_classifier=frame_classifier),
+                                                            "framescore_score")
         comprehensive_picker = [GRUENMetric(), "GRUEN", 10,
                                 LengthScore(filter_stopwords=True, include_premise=True), "LengthScore_relative", 2,
                                 LengthScore(filter_stopwords=True), "LengthScore_content_word_ratio", 1,

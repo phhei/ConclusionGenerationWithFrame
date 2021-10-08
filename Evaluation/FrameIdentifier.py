@@ -88,7 +88,8 @@ def get_frame_classifier(frame_set: FrameSet, preferred_model: str = "distilrobe
             logger.debug("Having following stats about the model (retrieved from {}):", model_path)
             logger.info(model_path.joinpath("metrics.txt").read_text(encoding="utf-8", errors="ignore"))
         else:
-            logger.warning("Found no metrics-file... maybe something went wrong?")
+            logger.warning("Found no metrics-file (expected at: \"{}\")... maybe something went wrong?",
+                           model_path.absolute())
             retrain = True
             logger.trace("Possibly retrain it...")
 
