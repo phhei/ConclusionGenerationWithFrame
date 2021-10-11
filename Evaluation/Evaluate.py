@@ -161,7 +161,7 @@ class CherryPicker:
 
     def __str__(self) -> str:
         return "CherryPicker with {} ({})".format(
-            ", ".join(map(lambda m: " {}[{}]".format(type(m[0]).__name__, m[1]), self.metrics)),
+            ", ".join(map(lambda m: "{}[{}]".format(type(m[0]).__name__, m[1]), self.metrics)),
             self.weights_norm
         )
 

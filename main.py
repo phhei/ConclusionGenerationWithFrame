@@ -47,11 +47,11 @@ checkpoint: Optional[pathlib.Path] = None
 
 # INFERENCE parameters
 cherry_picker_selection = CherryPickerSelection()
-cherry_pickers: List[Optional[CherryPicker]] = [
-    cherry_picker_selection["None"],
-    cherry_picker_selection["BERTPicker"],
-    cherry_picker_selection["ComprehensivePicker"],
-    cherry_picker_selection["CheaterPicker"]
+cherry_pickers: List[str] = [
+    "None",
+    "BERTPicker",
+    "ComprehensivePicker",
+    "CheaterPicker"
 ]
 preferred_model_for_frame_identifier = "distilroberta-base"
 
@@ -79,9 +79,10 @@ def make_topic_distinct(split_1: pandas.DataFrame, split_2: pandas.DataFrame) ->
 
 
 def convert_samples_to_input_str(split: pandas.DataFrame,
-                                 frame_start: Optional[str] = None, frame_end: Optional[str] = None,
-                                 topic_start: Optional[str] = None, topic_end: Optional[str] = None) \
-        -> List[Tuple[str, str, int]]:
+                                 frame_start: Optional[str] = FRAME_START_TOKEN,
+                                 frame_end: Optional[str] = FRAME_END_TOKEN,
+                                 topic_start: Optional[str] = TOPIC_START_TOKEN,
+                                 topic_end: Optional[str] = TOPIC_END_TOKEN) -> List[Tuple[str, str, int]]:
     def control_code(row) -> str:
         ret = " "
         if include_frame:
@@ -91,14 +92,18 @@ def convert_samples_to_input_str(split: pandas.DataFrame,
                                         "" if frame_end is None else " {}".format(frame_end))
             else:
                 ret += "{}{}{} ".format(
-                    "" if topic_start is None else "{} ".format(topic_start),
+                    "" if frame_start is None else "{} ".format(frame_start),
                     cluster_frame.issues_specific_frame_to_generic(
                         issue_specific_frame=row["frame"], topic=row["topic"] if include_topic else None
                     ),
-                    "" if topic_end is None else " {}".format(topic_end)
+                    "" if frame_end is None else " {}".format(frame_end)
                 )
         if include_topic:
-            ret += "{} ".format(row["topic"])
+            ret += "{}{}{} ".format(
+                "" if topic_start is None else "{} ".format(topic_start),
+                row["topic"],
+                "" if topic_end is None else " {}".format(topic_end)
+            )
         return ret.rstrip()
     return [("summarize{}: {}".format(control_code(row), str(row["premise"]).strip(" \"'")), row["conclusion"],
              0 if cluster_frame is None else
@@ -209,11 +214,7 @@ if __name__ == '__main__':
                 " :: ".join(tokenizer.get_added_vocab().keys()),
                 len(tokenizer.get_vocab()))
 
-    train_x, train_y = convert_input_str_to_input_int(split=convert_samples_to_input_str(train,
-                                                                                         frame_start=FRAME_START_TOKEN,
-                                                                                         frame_end=FRAME_END_TOKEN,
-                                                                                         topic_start=TOPIC_START_TOKEN,
-                                                                                         topic_end=TOPIC_END_TOKEN),
+    train_x, train_y = convert_input_str_to_input_int(split=convert_samples_to_input_str(train),
                                                       fn_tokenizer=tokenizer,
                                                       max_length=(max_length_premise, max_length_conclusion))
     length_x = train_x.pop("length")
@@ -232,17 +233,10 @@ if __name__ == '__main__':
                     ", ".join(["{}: {}".format(c[1], (train_x["frame_index"] == c[0]).count_nonzero().item())
                                for c in cluster_frame.data.itertuples(index=True, name=None)]))
 
-    val_x, val_y = convert_input_str_to_input_int(convert_samples_to_input_str(val, frame_start=FRAME_START_TOKEN,
-                                                                               frame_end=FRAME_END_TOKEN,
-                                                                               topic_start=TOPIC_START_TOKEN,
-                                                                               topic_end=TOPIC_END_TOKEN),
+    val_x, val_y = convert_input_str_to_input_int(convert_samples_to_input_str(val),
                                                   fn_tokenizer=tokenizer,
                                                   max_length=(max_length_premise, max_length_conclusion))
-    test_x, test_y = convert_input_str_to_input_int(convert_samples_to_input_str(test,
-                                                                                 frame_start=FRAME_START_TOKEN,
-                                                                                 frame_end=FRAME_END_TOKEN,
-                                                                                 topic_start=TOPIC_START_TOKEN,
-                                                                                 topic_end=TOPIC_END_TOKEN),
+    test_x, test_y = convert_input_str_to_input_int(convert_samples_to_input_str(test),
                                                     fn_tokenizer=tokenizer,
                                                     max_length=(max_length_premise, max_length_conclusion))
 
@@ -328,7 +322,6 @@ if __name__ == '__main__':
     if len(cherry_pickers) >= 1:
         logger.info("Starting with the inference now. Before we can do this, we must setup the {} cherry-pickers!",
                     len(cherry_pickers))
-        logger.debug("You're planning to use: {}", " / ".join(map(lambda cp: str(cp), cherry_pickers)))
         chery_tokenizer: transformers.PreTrainedTokenizer = transformers.AutoTokenizer.from_pretrained(
             pretrained_model_name_or_path=preferred_model_for_frame_identifier
         )
@@ -362,6 +355,8 @@ if __name__ == '__main__':
             label_smoothing=.1 if label_smoothing is None else label_smoothing,
             handle_raw_dataset=False
         )
+        cherry_pickers: List[CherryPicker] = [cherry_picker_selection[s] for s in cherry_pickers]
+        logger.debug("You're planning to use: {}", " / ".join(map(lambda cp: str(cp), cherry_pickers)))
         logger.trace("{} cherry-pickers loaded", len(cherry_picker_selection))
 
     for cherry_picker in cherry_pickers:

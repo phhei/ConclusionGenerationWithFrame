@@ -487,8 +487,14 @@ class T5Trainer:
             sample_x, sample_x_attention, sample_x_frame_id, sample_y = data
 
             plain_input_premise = self.tokenizer.decode(token_ids=sample_x,
-                                                        skip_special_tokens=True,
+                                                        skip_special_tokens=False,
                                                         clean_up_tokenization_spaces=True)
+            try:
+                plain_input_premise = plain_input_premise.replace(self.tokenizer.pad_token, " ").\
+                    replace(self.tokenizer.eos_token, " ").strip()
+            except TypeError:
+                logger.opt(exception=False).warning("The tokenizer \"{}\" doesn't know a padding or EOS-token",
+                                                    type(self.tokenizer))
             plain_ground_truth = self.tokenizer.decode(token_ids=sample_y,
                                                        skip_special_tokens=True,
                                                        clean_up_tokenization_spaces=True)

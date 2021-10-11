@@ -9,6 +9,7 @@ from sacrerouge.metrics import Metric, ReferenceFreeMetric
 from transformers import BertForMaskedLM, BertTokenizer, BertConfig, BertForSequenceClassification
 
 from Evaluation.GRUEN.Main import get_gruen
+from const import FRAME_END_TOKEN, TOPIC_END_TOKEN
 
 
 @Metric.register(name="GRUEN", exist_ok=False)
@@ -46,7 +47,14 @@ class GRUENMetric(ReferenceFreeMetric):
                 if isinstance(summary, List) or isinstance(summary, Tuple):
                     logger.trace("Input consists of two parts: premise: \"{}\" --> conclusion: \"{}\"", summary[0],
                                  summary[1])
-                    summary = " ".join(map(lambda s: s if s.endswith(".") else "{}.".format(s.rstrip(" .!?")), summary))
+                    summary_prem = summary[0] if summary[0].endswith(".") else "{}.".format(summary[0].rstrip(" .!?"))
+                    if FRAME_END_TOKEN in summary_prem:
+                        summary_prem = summary_prem[summary_prem.index(FRAME_END_TOKEN)+1:]
+                    if TOPIC_END_TOKEN in summary_prem:
+                        summary_prem = summary_prem[summary_prem.index(TOPIC_END_TOKEN)+1:]
+                    summary_prem = summary_prem.lstrip(": '#")
+                    summary_concl = summary[1]
+                    summary = "{} {}".format(summary_prem, summary_concl)
                     logger.trace("Concatenated to: \"{}\"", summary)
                 else:
                     logger.warning("Expected a list (premise, conclusion), but got only 1 part: \"{}\"", summary)

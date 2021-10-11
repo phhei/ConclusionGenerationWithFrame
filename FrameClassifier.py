@@ -193,6 +193,10 @@ class FrameClassifier:
 
         logger.trace("Resolved the encoding: {}", encoding)
 
+        if self.model.training:
+            logger.warning("The frame-classifier is still in training mode -- let's change this!")
+            self.model.eval()
+
         predictions = self.model(
             input_ids=encoding["input_ids"],
             attention_mask=encoding["attention_mask"],

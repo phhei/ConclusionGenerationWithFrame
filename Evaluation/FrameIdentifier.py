@@ -159,7 +159,7 @@ class FrameScore(ReferenceFreeMetric):
                 try:
                     if FRAME_START_TOKEN in summary[0] and FRAME_END_TOKEN in summary[0]:
                         expected_frame = \
-                            summary[0][summary[0].index(FRAME_START_TOKEN)+1:summary[0].index(FRAME_START_TOKEN)]
+                            summary[0][summary[0].index(FRAME_START_TOKEN)+1:summary[0].index(FRAME_END_TOKEN)]
                     else:
                         logger.warning("\"{}\" contains no information about the expected frame!", summary[0])
                         expected_frame = self.frame_set.name
