@@ -1,4 +1,5 @@
 import pathlib
+import time
 from typing import Any, Optional, Tuple, Dict, Union
 
 import loguru
@@ -436,11 +437,39 @@ class T5Trainer:
                         "(see https://towardsdatascience.com/converting-from-keras-to-pytorch-lightning-be40326d7b7d)",
                         self.teacher.logger.save_dir)
 
-        self.teacher.checkpoint_connector.restore_model_weights(
-            checkpoint_path=self.trainer_module.checkpoint.best_model_path
-        )
-        self.model = self.trainer_module.model
-        logger.info("Restore best transformer {}", str(self.model)[:min(len(str(self.model)), 33)])
+        load_cp = True
+        while load_cp:
+            try:
+                self.teacher.checkpoint_connector.restore_model_weights(
+                    checkpoint_path=self.trainer_module.checkpoint.best_model_path
+                )
+                load_cp = False
+
+                self.model = self.trainer_module.model
+                logger.info("Restore best transformer {}", str(self.model)[:min(len(str(self.model)), 33)])
+            except IOError:
+                logger.opt(exception=True).error("Trouble by restoring the best model weights...")
+                time.sleep(1.5)
+                if pathlib.Path(self.trainer_module.checkpoint.best_model_path).exists():
+                    logger.success("\"{}\" exists - so, let's retry loading it",
+                                   self.trainer_module.checkpoint.best_model_path)
+                    age = abs(time.time() - pathlib.Path(self.trainer_module.checkpoint.best_model_path).stat().st_ctime)
+                    if age >= 3600:
+                        logger.error("The checkpoint is older than 1h ({}h). I guess something went terrible wrong - "
+                                     "skip the restoring process", round(age / 3600., 1))
+                        load_cp = False
+                        self.model = self.trainer_module.model
+                    elif age >= 60:
+                        logger.warning("Seems not to be the first time trying to load this file ({}m)..."
+                                       "give the system a little bite more time...", round(age/60.))
+                        time.sleep(60)
+                else:
+                    logger.error("The checkpoint was never written. Directory exists: {}",
+                                 pathlib.Path(self.trainer_module.checkpoint.best_model_path).parent.exists())
+                    if pathlib.Path(self.trainer_module.checkpoint.best_model_path).parent.exists():
+                        for f in pathlib.Path(self.trainer_module.checkpoint.best_model_path).parent.iterdir():
+                            logger.trace("Found: {}", f.absolute())
+                    load_cp = False
 
         return pathlib.Path(self.teacher.logger.save_dir, "version_{}".format(self.teacher.logger.version)) \
             if self.teacher.logger.save_dir is not None else None

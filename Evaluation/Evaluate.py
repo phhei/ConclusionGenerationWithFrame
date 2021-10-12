@@ -113,7 +113,8 @@ def score(predictions: List[Union[str, Tuple[str, str]]], reference: Optional[st
     logger.trace(scores_avg)
 
     logger.info("The best prediction is the {}. one: \"{}\" with a score of {} ({})",
-                scores_avg[0][0], predictions[scores_avg[0][0]], scores_avg[0][1], scores[scores_avg[0][0]])
+                scores_avg[0][0], predictions[scores_avg[0][0]], scores_avg[0][1],
+                " # ".join(["{}: {}".format(m, round(v, 4)) for m, v in scores[scores_avg[0][0]].items()]))
 
     logger.trace("Return the list index of the best prediction...")
     return scores_avg[0][0]
@@ -212,14 +213,22 @@ class CherryPickerSelection(dict):
         self["ComprehensivePicker"] = None
         self["CheaterPicker"] = None
 
-        logger.warning("We've preloaded following cherry-pickers: {}. Be aware! Unitl yet, all these pickers are "
+        logger.warning("We've preloaded following cherry-pickers: {}. Be aware! Until yet, all these pickers are "
                        "without any function. Please call load_cherrypicker_collection to change this!",
                        ", ".join(self.keys()))
 
     def load_cherrypicker_collection(self, **kwargs):
         if "used_frame_set" in kwargs:
             frame_set = kwargs.pop("used_frame_set")
-            frame_classifier = get_frame_classifier(frame_set=frame_set, **kwargs)
+            if frame_set is None or not isinstance(frame_set, FrameSet):
+                logger.error("Your selected frame-set is {} but should be a FrameSet. "
+                             "Ignore this error if you don't want to consider a specific generic frame set.",
+                             type(frame_set))
+                frame_set = None
+                frame_classifier = None
+                logger.warning("Will ignore all Cherry-Picker-components which consider the [generic] frame.")
+            else:
+                frame_classifier = get_frame_classifier(frame_set=frame_set, **kwargs)
         else:
             frame_set = None
             frame_classifier = None
@@ -239,7 +248,7 @@ class CherryPickerSelection(dict):
                                 LengthScore(filter_stopwords=True), "LengthScore_content_word_ratio", 1,
                                 ClaimLikeScore(), "ClaimLikeScore_summary", 5,
                                 BertScorePremConc(), "bertscorePremCon", 12]
-        if frame_set is not None or frame_classifier is None:
+        if frame_set is not None or frame_classifier is not None:
             comprehensive_picker.extend([FrameScore(frame_set=frame_set, frame_classifier=frame_classifier),
                                          "framescore_score", 15])
         self["ComprehensivePicker"] = tuple(comprehensive_picker)
