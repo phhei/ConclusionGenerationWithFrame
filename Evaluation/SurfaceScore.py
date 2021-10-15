@@ -12,7 +12,7 @@ from sacrerouge.metrics import Metric, ReferenceFreeMetric
 
 
 # related to https://aclanthology.org/E17-1017.pdf ON SURFACE
-from Evaluation.Evaluate import clean_premise
+from Evaluation.Utils import clean_premise
 
 
 class SurfaceHint(ReferenceFreeMetric):

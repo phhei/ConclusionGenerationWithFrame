@@ -8,7 +8,7 @@ from sacrerouge.metrics import BertScore, Metric, ReferenceBasedMetric, Referenc
 
 import torch
 
-from Evaluation.Evaluate import clean_premise
+from Evaluation.Utils import clean_premise
 
 
 @Metric.register(name="bertscore", exist_ok=True)

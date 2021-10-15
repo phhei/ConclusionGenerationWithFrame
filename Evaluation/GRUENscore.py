@@ -8,7 +8,7 @@ from sacrerouge.data.types import SummaryType
 from sacrerouge.metrics import Metric, ReferenceFreeMetric
 from transformers import BertForMaskedLM, BertTokenizer, BertConfig, BertForSequenceClassification
 
-from Evaluation.Evaluate import clean_premise
+from Evaluation.Utils import clean_premise
 from Evaluation.GRUEN.Main import get_gruen
 from const import FRAME_END_TOKEN, TOPIC_END_TOKEN
 

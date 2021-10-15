@@ -12,7 +12,6 @@ from Evaluation.GRUENscore import GRUENMetric
 from Evaluation.SurfaceScore import LengthScore, ClaimLikeScore
 from Evaluation.FrameIdentifier import FrameScore, get_frame_classifier
 from Frames import FrameSet
-from const import FRAME_END_TOKEN, TOPIC_END_TOKEN
 
 
 def score_sql(path: pathlib.Path, row_id: str, col_predict: str, col_ref: str, metrics: Optional[List[Metric]] = None,
@@ -119,23 +118,6 @@ def score(predictions: List[Union[str, Tuple[str, str]]], reference: Optional[st
 
     logger.trace("Return the list index of the best prediction...")
     return scores_avg[0][0]
-
-
-def clean_premise(premise: str) -> str:
-    logger.trace("OK, you want to remove the control code from the premise: \"{}\"", premise)
-    if FRAME_END_TOKEN in premise:
-        index = premise.index(FRAME_END_TOKEN)
-        logger.trace("Found the frame end token \"{}\" at position {} - cut", FRAME_END_TOKEN, index)
-        premise = premise[index + 1:]
-    if TOPIC_END_TOKEN in premise:
-        index = premise.index(TOPIC_END_TOKEN)
-        logger.trace("Found the topic end token \"{}\" at position {} - cut", TOPIC_END_TOKEN, index)
-        premise = premise[index + 1:]
-
-    logger.trace("Last cleaning steps...")
-    premise = premise.strip(" :")
-
-    return premise
 
 
 class CherryPicker:

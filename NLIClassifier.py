@@ -30,11 +30,6 @@ test_part: float = .1
 ground_model: str = "microsoft/deberta-v2-xlarge-mnli"  #"roberta-large-mnli"
 label_smoothing: Optional[None] = .1
 max_epochs: int = 5
-class_dict: dict = {
-    "CONTRADICTION": 0,
-    "NEUTRAL": 1,
-    "ENTAILMENT": 2
-}
 
 #################################################################################
 # =================================== PROGRAM ===================================
@@ -68,6 +63,11 @@ if __name__ == "__main__":
         df = df[:int(used_portion*len(df))]
     logger.info("Loaded \"{}\": {} samples with following columns: {}", dataset, len(df), df.columns)
 
+    tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(ground_model)
+    model: PreTrainedModel = AutoModelForSequenceClassification.from_pretrained(ground_model, return_dict=True)
+
+    logger.success("Successfully loaded the model ({}) and tokenizer ({})", model.config.architectures, tokenizer)
+
     final_dataset = []
     for sid, sample in df.iterrows():
         logger.trace("Fetch following row ({}): {}", sid, sample)
@@ -75,7 +75,7 @@ if __name__ == "__main__":
             ("{}: {}".format(sample["topic"], sample["premise"]) if include_topic
              else sample["premise"],
              sample["conclusion"],
-             class_dict["ENTAILMENT"])
+             model.config.label2id["ENTAILMENT"])
         )
 
         logger.trace("Let's generate a neutral sample (complete random conclusion) for the sample {}", sid)
@@ -86,7 +86,7 @@ if __name__ == "__main__":
             ("{}: {}".format(sample["topic"], sample["premise"]) if include_topic
              else sample["premise"],
              neutral_sample["conclusion"].item(),
-             class_dict["NEUTRAL"])
+             model.config.label2id["NEUTRAL"])
         )
 
         logger.trace("Let's generate a contradicting sample (complete random conclusion) for the sample {}", sid)
@@ -113,19 +113,14 @@ if __name__ == "__main__":
                 ("{}: {}".format(sample["topic"], sample["premise"]) if include_topic
                  else sample["premise"],
                  contrast_sample["conclusion"].item(),
-                 class_dict["CONTRADICTION"])
+                 model.config.label2id["CONTRADICTION"])
             )
 
     logger.success("Successfully crawled {} samples ({} entail, {} neutral, {} contradiction)",
                    len(final_dataset),
-                   len(list(filter(lambda f: f[-1] == class_dict["ENTAILMENT"], final_dataset))),
-                   len(list(filter(lambda f: f[-1] == class_dict["NEUTRAL"], final_dataset))),
-                   len(list(filter(lambda f: f[-1] == class_dict["CONTRADICTION"], final_dataset))))
-
-    tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(ground_model)
-    model: PreTrainedModel = AutoModelForSequenceClassification.from_pretrained(ground_model, return_dict=True)
-
-    logger.success("Successfully loaded the model ({}) and tokenizer ({})", model.config.architectures, tokenizer)
+                   len(list(filter(lambda f: f[-1] == model.config.label2id["ENTAILMENT"], final_dataset))),
+                   len(list(filter(lambda f: f[-1] == model.config.label2id["NEUTRAL"], final_dataset))),
+                   len(list(filter(lambda f: f[-1] == model.config.label2id["CONTRADICTION"], final_dataset))))
 
     logger.trace("Now let's split the datasets into {}%/{}%/{}%", round(train_part*100), round(dev_part*100),
                  round(test_part*100))
