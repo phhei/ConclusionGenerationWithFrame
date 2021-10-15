@@ -1,17 +1,15 @@
 import math
+import pprint
+from pathlib import Path
+from typing import Optional, List, Tuple, Union
 
 import torch
+from loguru import logger
+from sklearn.metrics import accuracy_score, balanced_accuracy_score
 from torch.utils.data import Dataset
-
-from pathlib import Path
-import pprint
-
 from torch.utils.data.dataset import T_co
 from transformers import AutoModelForSequenceClassification, PreTrainedModel, AutoTokenizer, PreTrainedTokenizer, \
-    AutoConfig, Trainer, TrainingArguments, DataCollatorWithPadding, default_data_collator
-from sklearn.metrics import accuracy_score, balanced_accuracy_score
-from typing import Optional, List, Tuple, Union
-from loguru import logger
+    AutoConfig, Trainer, TrainingArguments, default_data_collator
 
 from Frames import FrameSet
 

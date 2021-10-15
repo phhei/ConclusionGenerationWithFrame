@@ -12,6 +12,7 @@ from sacrerouge.metrics import Metric, ReferenceFreeMetric
 
 
 # related to https://aclanthology.org/E17-1017.pdf ON SURFACE
+from Evaluation.Evaluate import clean_premise
 
 
 class SurfaceHint(ReferenceFreeMetric):
@@ -100,7 +101,7 @@ class LengthScore(SurfaceHint):
                 if isinstance(summary, List) or isinstance(summary, Tuple):
                     logger.trace("Input consists of two parts: premise: \"{}\" --> conclusion: \"{}\"", summary[0],
                                  summary[1])
-                    preprocessed_premise = self.preprocess_input(summary[0])
+                    preprocessed_premise = self.preprocess_input(clean_premise(summary[0]))
                     preprocessed_conclusion = self.preprocess_input(summary[1])
                 else:
                     if self.include_premise:

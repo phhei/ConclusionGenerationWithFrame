@@ -211,7 +211,7 @@ class FrameSet:
                                                                          semantic_reordering=False,
                                                                          fetch_column=None)
                 elif not isinstance(sample_frame, int):
-                    logger.warning("Only strings and ints are allowed as frame-id-input (first element of each "
+                    logger.warning("Only strings and ints are allowed as frame-sid-input (first element of each "
                                    "corpus-tuple), but you input a {}!", type(sample_frame))
                     if isinstance(sample_frame, torch.Tensor):
                         sample_frame = sample_frame.item()

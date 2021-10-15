@@ -8,6 +8,7 @@ from sacrerouge.data.types import SummaryType
 from sacrerouge.metrics import Metric, ReferenceFreeMetric
 from transformers import BertForMaskedLM, BertTokenizer, BertConfig, BertForSequenceClassification
 
+from Evaluation.Evaluate import clean_premise
 from Evaluation.GRUEN.Main import get_gruen
 from const import FRAME_END_TOKEN, TOPIC_END_TOKEN
 
@@ -48,11 +49,7 @@ class GRUENMetric(ReferenceFreeMetric):
                     logger.trace("Input consists of two parts: premise: \"{}\" --> conclusion: \"{}\"", summary[0],
                                  summary[1])
                     summary_prem = summary[0] if summary[0].endswith(".") else "{}.".format(summary[0].rstrip(" .!?"))
-                    if FRAME_END_TOKEN in summary_prem:
-                        summary_prem = summary_prem[summary_prem.index(FRAME_END_TOKEN)+1:]
-                    if TOPIC_END_TOKEN in summary_prem:
-                        summary_prem = summary_prem[summary_prem.index(TOPIC_END_TOKEN)+1:]
-                    summary_prem = summary_prem.lstrip(": '#")
+                    summary_prem = clean_premise(summary_prem).lstrip("'#")
                     summary_concl = summary[1]
                     summary = "{} {}".format(summary_prem, summary_concl)
                     logger.trace("Concatenated to: \"{}\"", summary)
