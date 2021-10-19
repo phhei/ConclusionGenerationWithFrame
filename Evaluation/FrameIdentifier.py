@@ -141,6 +141,7 @@ class FrameScore(ReferenceFreeMetric):
         self.frame_set = frame_set
         self.frame_classifier = frame_classifier
         self.include_premise = True
+        self.premise_col = "input"
 
         logger.success("Initialized the {}-scorer: {}", frame_set, frame_classifier)
         logger.debug("--> classifier type: {}", type(self.frame_classifier.model))

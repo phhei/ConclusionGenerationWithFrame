@@ -83,7 +83,7 @@ class FrameSet:
     def add_ecology_frame(self):
         self.data = self.data.append(
             pandas.DataFrame.from_records(
-                data=[("ecology", "nature ecology",
+                data=[("ecology", "ecology environmental sustainability",
                        numpy.average([self.w2v.get("nature", numpy.zeros_like(self.w2v["the"])),
                                       self.w2v.get("ecology", numpy.zeros_like(self.w2v["the"]))], axis=0),
                        "ecological aspect, effects on the environment")],

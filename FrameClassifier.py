@@ -113,7 +113,10 @@ class FrameClassifier:
                     load_best_model_at_end=True,
                     metric_for_best_model="eval_loss",
                     greater_is_better=False,
-                    label_smoothing_factor=kwargs.get("label_smoothing", .1)
+                    label_smoothing_factor=kwargs.get("label_smoothing", .1),
+                    eval_accumulation_steps=100,
+                    per_device_train_batch_size=16,
+                    per_device_eval_batch_size=32
                 ),
                 compute_metrics=compute_metrics,
                 data_collator=default_data_collator,

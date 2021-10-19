@@ -19,7 +19,7 @@ class SurfaceHint(ReferenceFreeMetric):
     tokenized_stuff = dict()
     try:
         stopwords_set = set(stopwords.words("english"))
-    except OSError:
+    except LookupError:
         logger.opt(exception=False).warning("We must download the stopwords first")
         if nltk.download("english"):
             sw = set(stopwords.words("english"))
@@ -92,6 +92,7 @@ class LengthScore(SurfaceHint):
         super().__init__(filter_stopwords)
 
         self.include_premise = include_premise
+        self.premise_col = "input"
 
     def score_multi_all(self, summaries_list: List[List[SummaryType]], **kwargs) -> List[List[MetricsDict]]:
         metrics_lists = []

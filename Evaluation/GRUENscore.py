@@ -39,6 +39,7 @@ class GRUENMetric(ReferenceFreeMetric):
         logger.trace("Load {}", self.cola_model)
 
         self.include_premise = True
+        self.premise_col = "input_without_special_tokens"
 
     def score_multi_all(self, summaries_list: List[List[SummaryType]], **kwargs) -> List[List[MetricsDict]]:
         metrics_lists = []
@@ -49,7 +50,6 @@ class GRUENMetric(ReferenceFreeMetric):
                     logger.trace("Input consists of two parts: premise: \"{}\" --> conclusion: \"{}\"", summary[0],
                                  summary[1])
                     summary_prem = summary[0] if summary[0].endswith(".") else "{}.".format(summary[0].rstrip(" .!?"))
-                    summary_prem = clean_premise(summary_prem).lstrip("'#")
                     summary_concl = summary[1]
                     summary = "{} {}".format(summary_prem, summary_concl)
                     logger.trace("Concatenated to: \"{}\"", summary)

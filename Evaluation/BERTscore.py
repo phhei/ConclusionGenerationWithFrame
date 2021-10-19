@@ -94,6 +94,7 @@ class BertScorePremConc(ReferenceFreeMetric):
         logger.debug("--> type: {}", self.scorer.model_type)
 
         self.include_premise = True
+        self.premise_col = "input"
         self.compute_novelty_of_conclusion = compute_novelty_of_conclusion
         self.only_precision = only_precision
 

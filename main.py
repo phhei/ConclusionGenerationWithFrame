@@ -10,7 +10,13 @@ import transformers
 from loguru import logger
 
 import Trainer
-from Evaluation.Evaluate import score_sql, CherryPicker, CherryPickerSelection
+from Evaluation.BERTscore import BertScore, BertScorePremConc
+from Evaluation.Evaluate import score_sql, CherryPicker, CherryPickerSelection, score_matrix
+from Evaluation.GRUENscore import GRUENMetric
+from Evaluation.Rougescore import RougeMetric
+from Evaluation.SurfaceScore import LengthScore, ClaimLikeScore
+from Evaluation.FrameIdentifier import FrameScore, get_frame_classifier
+from Evaluation.StanceRelationScore import StanceScore
 from Frames import FrameSet
 from Transformer import FrameBiasedT5ForConditionalGeneration
 from const import FRAME_START_TOKEN, FRAME_END_TOKEN, TOPIC_START_TOKEN, TOPIC_END_TOKEN
@@ -28,32 +34,35 @@ train_val_test_topic_distinct: bool = limit_samples < 0 or limit_samples >= 200
 max_length_premise: int = 128
 max_length_conclusion: int = 24
 include_frame: bool = True
-frame_set: Optional[str] = "media_frames"
-include_topic: bool = True
+frame_set: Optional[str] = sys.argv[sys.argv.index("frame_set")+1] if "frame_set" in sys.argv else None # media_frames
+include_topic: bool = \
+    sys.argv[sys.argv.index("include_topic") + 1].upper() == "TRUE" if "include_topic" in sys.argv else True
 
 # TRAINING parameters
-label_smoothing: Optional[float] = None
-tdf_vocab_smoothing_factor: Optional[float] = None
-frame_vocab_smoothing_factor: Optional[float] = None
-tokenizer: transformers.PreTrainedTokenizer = transformers.T5Tokenizer.from_pretrained("t5-small", extra_ids=128)
+label_smoothing: Optional[float] = \
+    float(sys.argv[sys.argv.index("label_smoothing") + 1]) if "label_smoothing" in sys.argv else None
+tdf_vocab_smoothing_factor: Optional[float] = \
+    float(sys.argv[sys.argv.index("tdf_vocab_smoothing_factor") + 1]) if "tdf_vocab_smoothing_factor" in sys.argv else None
+frame_vocab_smoothing_factor: Optional[float] = \
+    float(sys.argv[sys.argv.index("frame_vocab_smoothing_factor") + 1]) if "frame_vocab_smoothing_factor" in sys.argv else None
+tokenizer: transformers.PreTrainedTokenizer = transformers.T5Tokenizer.from_pretrained("t5-large", extra_ids=128)
+model_str: str = sys.argv[sys.argv.index("model")+1] if "model" in sys.argv else "t5-large"
 if frame_set is None:
-    model: transformers.PreTrainedModel = transformers.T5ForConditionalGeneration.from_pretrained("t5-small")
+    model: transformers.PreTrainedModel = transformers.T5ForConditionalGeneration.from_pretrained("t5-large")
 else:
-    model: str = "t5-small"
+    model: str = "t5-large"
 checkpoint: Optional[pathlib.Path] = None
 # checkpoint: Optional[pathlib.Path] = pathlib.Path(".out", "pytorch_lightning", "T5ForConditionalGeneration",
 #                                                  "128-24", "lightning_logs", "version_3", "checkpoints",
 #                                                  "epoch=7-step=2471.ckpt")
+# checkpoint = pathlib.Path(".out", "pytorch_lightning", "T5ForConditionalGeneration", "128-24", "smoothing0.2", "tdf0.15", "lightning_logs", "version_0", "checkpoints", "epoch=11-step=3707.ckpt")
 
 # INFERENCE parameters
-cherry_picker_selection = CherryPickerSelection()
-cherry_pickers: List[str] = [
-    "None",
-    "BERTPicker",
-    "ComprehensivePicker",
-    "CheaterPicker"
-]
-preferred_model_for_frame_identifier = "distilroberta-base"
+preferred_model_for_frame_identifier: Optional[str] = "distilroberta-base"
+preferred_model_for_stance_identifier: Optional[str] = pathlib.Path("stance_classifier", "microsoft",
+                                                                    "deberta-base-mnli", "with topic", "152")
+preferred_tokenizer_for_stance_identifier: Optional[str] = "microsoft/deberta-base-mnli"
+samples_to_be_generate: int = -1
 
 # OTHER PARAMS
 log_level_console: str = "INFO"
@@ -319,71 +328,107 @@ if __name__ == '__main__':
         root_save_path = checkpoint.parent.parent
     trainer.test()
 
-    if len(cherry_pickers) >= 1:
-        logger.info("Starting with the inference now. Before we can do this, we must setup the {} cherry-pickers!",
-                    len(cherry_pickers))
-        chery_tokenizer: transformers.PreTrainedTokenizer = transformers.AutoTokenizer.from_pretrained(
+    logger.trace("###################################################################################################")
+    logger.trace("####################################### Initializes Metrics #######################################")
+    logger.trace("###################################################################################################")
+
+    metrics_list = [
+        BertScore(),
+        BertScorePremConc(only_precision=False),
+        GRUENMetric(),
+        RougeMetric(),
+        LengthScore(include_premise=True, filter_stopwords=True),
+        ClaimLikeScore()
+    ]
+    if cluster_frame is not None and preferred_model_for_frame_identifier is not None:
+        frame_tokenizer: transformers.PreTrainedTokenizer = transformers.AutoTokenizer.from_pretrained(
             pretrained_model_name_or_path=preferred_model_for_frame_identifier
         )
-        cherry_picker_selection.load_cherrypicker_collection(
-            used_frame_set=cluster_frame,
-            preferred_model=preferred_model_for_frame_identifier,
-            corpus_data=[(chery_tokenizer(text=content["conclusion"], padding="max_length",
-                                          max_length=max_length_conclusion, truncation=True, is_split_into_words=False,
-                                          return_tensors="pt")["input_ids"][0],
-                          cluster_frame.issues_specific_frame_to_generic(
-                              issue_specific_frame=content["frame"],
-                              topic=str(content["argument_id"])[:str(content["argument_id"]).index("1")],
-                              fetch_column=None,
-                              semantic_reordering=False,
-                              remove_stopwords=True
-                          ) if cluster_frame is not None else int(content["frame_id"]))
-                         for index, content in
-                         pandas.read_csv(
-                             filepath_or_buffer=str(
-                                 pathlib.Path("frame_sets", "frame_datasets",
-                                              "Media-frames-immigrationsamesexsmoking.csv").absolute()
-                             ),
-                             delimiter="|",
-                             verbose=False,
-                             quotechar="\"",
-                             doublequote=True
-                         ).iterrows()
-                         if "headline" not in content["frame"]],
-            retrain=False,
-            max_length=max_length_conclusion,
-            label_smoothing=.1 if label_smoothing is None else label_smoothing,
-            handle_raw_dataset=False
+        metrics_list.append(
+            FrameScore(
+                frame_set=cluster_frame,
+                frame_classifier=get_frame_classifier(
+                    frame_set=cluster_frame,
+                    preferred_model=preferred_model_for_frame_identifier,
+                    corpus_data=[(frame_tokenizer(text=content["conclusion"], padding="max_length",
+                                                  max_length=max_length_conclusion, truncation=True,
+                                                  is_split_into_words=False,
+                                                  return_tensors="pt")["input_ids"][0],
+                                  cluster_frame.issues_specific_frame_to_generic(
+                                      issue_specific_frame=content["frame"],
+                                      topic=str(content["argument_id"])[:str(content["argument_id"]).index("1")],
+                                      fetch_column=None,
+                                      semantic_reordering=False,
+                                      remove_stopwords=True
+                                  ) if cluster_frame is not None else int(content["frame_id"]))
+                                 for index, content in
+                                 pandas.read_csv(
+                                     filepath_or_buffer=str(
+                                         pathlib.Path("frame_sets", "frame_datasets",
+                                                      "Media-frames-immigrationsamesexsmoking.csv").absolute()
+                                     ),
+                                     delimiter="|",
+                                     verbose=False,
+                                     quotechar="\"",
+                                     doublequote=True
+                                 ).iterrows()
+                                 if "headline" not in content["frame"]
+                                 ],
+                    retrain=False,
+                    max_length=max_length_conclusion,
+                    label_smoothing=.1 if label_smoothing is None else label_smoothing,
+                    handle_raw_dataset=False
+                )
+            )
         )
-        cherry_pickers: List[CherryPicker] = [cherry_picker_selection[s] for s in cherry_pickers]
-        logger.debug("You're planning to use: {}", " / ".join(map(lambda cp: str(cp), cherry_pickers)))
-        logger.trace("{} cherry-pickers loaded", len(cherry_picker_selection))
+        logger.success("Appended a FrameScorer: {} (base: {})", metrics_list[-1], preferred_model_for_frame_identifier)
+    elif cluster_frame is not None:
+        logger.warning("You use a generic frame cluster ({}), but you want not to check the frame evaluation scores!",
+                       cluster_frame.name)
+    if preferred_model_for_stance_identifier is not None:
+        metrics_list.append(
+            StanceScore(
+                stance_classifier=preferred_model_for_stance_identifier,
+                classifier_tokenizer=preferred_tokenizer_for_stance_identifier,
+                include_topic=include_topic
+            )
+        )
+        logger.success("Appended a StanceScorer: {} (base: {})", metrics_list[-1],
+                       preferred_model_for_stance_identifier)
+    else:
+        logger.warning("You deny a proper stance scorer!")
 
-    for cherry_picker in cherry_pickers:
-        if cherry_picker is not None:
-            logger.info("Let's generate data with the the following Cherry-Picker: {}", cherry_picker)
-        generated_data = trainer.generate(limit=250, cherry_picker=cherry_picker)
-        columns = generated_data.pop("columns")
-        df = pandas.DataFrame.from_dict(data=generated_data, orient="index", columns=columns)
-        logger.success("Generated {} samples ({})", len(df), "|".join(df.columns))
-        if root_save_path is not None:
-            root_save_path_cherry_picked = \
-                root_save_path.joinpath("beam_search" if cherry_picker is None else cherry_picker.short_str())
-            root_save_path_cherry_picked.mkdir(parents=True, exist_ok=True)
-            csv_path = root_save_path_cherry_picked.joinpath("predictions.csv")
-            sql_path = root_save_path_cherry_picked.joinpath("predictions.sql")
-            logger.info("Let's save the generations into {} -> {} / {}", root_save_path_cherry_picked,
-                        csv_path.name, sql_path.name)
-            df.to_csv(path_or_buf=str(csv_path.absolute()), index_label="Test_ID")
-            sql_con = sqlite3.connect(database=str(sql_path.absolute()))
-            df.to_sql(name="Predictions", con=sql_con, index_label="Test_ID",
-                      if_exists="replace")
-            pandas.DataFrame.from_records(
-                data=test, index=["test_{}".format(i) for i in range(len(test))]
-            ).to_sql(name="Data", con=sql_con, index_label="Test_ID", if_exists="replace")
-            sql_con.close()
+    logger.trace("####################################################################################################")
+    logger.trace("######################################### Start  inference #########################################")
+    logger.trace("####################################################################################################")
 
-            if sql_path.exists():
-                score_sql(path=sql_path, row_id="Test_ID", col_predict=columns[-1], col_ref=columns[1])
-        else:
-            logger.warning("Don't save the {} generations because you don't define a saving place", len(generated_data))
+    generated_data = trainer.generate(limit=samples_to_be_generate, cherry_picker=None, comprehensive_result=True)
+    columns = generated_data.pop("columns")
+    df = pandas.DataFrame.from_dict(data=generated_data, orient="index", columns=columns)
+    logger.success("Generated {} samples ({})", len(df), "|".join(df.columns))
+    if root_save_path is not None:
+        root_save_path.mkdir(parents=True, exist_ok=True)
+        df.to_csv(path_or_buf=root_save_path.joinpath("predictions.csv"), index_label="test_ID")
+        sql_con = sqlite3.connect(database=str(root_save_path.joinpath("predictions.sql").absolute()))
+        df.to_sql(name="Predictions", con=sql_con, index_label="Test_ID", if_exists="replace")
+        pandas.DataFrame.from_records(
+            data=test, index=["test_{}".format(i) for i in range(len(test))]
+        ).to_sql(name="Data", con=sql_con, index_label="Test_ID", if_exists="replace")
+        sql_con.close()
+
+        score_matrix(ret_dict=generated_data, evaluation_instances=metrics_list)
+        columns_extended = list(generated_data[list(generated_data.keys())[0]].keys())
+        df = pandas.DataFrame.from_dict(data=generated_data, orient="index", columns=columns_extended)
+        df.to_csv(path_or_buf=root_save_path.joinpath("predictions_scores.csv"), index_label="test_ID")
+        sql_con = sqlite3.connect(database=str(root_save_path.joinpath("predictions_scores.sql").absolute()))
+        df.to_sql(name="Predictions", con=sql_con, index_label="Test_ID", if_exists="replace")
+        pandas.DataFrame.from_records(
+            data=test, index=["test_{}".format(i) for i in range(len(test))]
+        ).to_sql(name="Data", con=sql_con, index_label="Test_ID", if_exists="replace")
+        sql_con.close()
+
+        logger.success("Succesfully saved the results of {} samples here in this dictionary: {}", len(df),
+                       root_save_path.absolute())
+    else:
+        logger.warning("Don't save the {} generations because you don't define a saving place", len(generated_data))
+

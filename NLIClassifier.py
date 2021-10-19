@@ -26,8 +26,8 @@ train_part: float = .8
 dev_part: float = .1
 test_part: float = .1
 
-# ground_model: str = "microsoft/deberta-base-mnli"
-ground_model: str = "microsoft/deberta-v2-xlarge-mnli"  #"roberta-large-mnli"
+ground_model: str = "microsoft/deberta-base-mnli"
+# ground_model: str = "roberta-large-mnli" # "microsoft/deberta-v2-xlarge-mnli"
 label_smoothing: Optional[None] = .1
 max_epochs: int = 5
 
@@ -130,8 +130,8 @@ if __name__ == "__main__":
     dev = final_dataset[int(train_part*len(final_dataset)):int((train_part+dev_part)*len(final_dataset))]
     test = final_dataset[-int(test_part*len(final_dataset)):]
 
-    out_dir: Path = Path("stance_classifier", ground_model, "with topic" if include_topic else "without topic",
-                         str(max_length))
+    out_dir: Path = Path("stance_classifier", ground_model.replace("/", "_"),
+                         "with topic" if include_topic else "without topic", str(max_length))
 
     train_x = tokenizer(
         text=list(map(lambda f: f[0], train)),
@@ -208,7 +208,10 @@ if __name__ == "__main__":
             load_best_model_at_end=True,
             metric_for_best_model="eval_loss",
             greater_is_better=False,
-            label_smoothing_factor=label_smoothing
+            label_smoothing_factor=label_smoothing,
+            per_device_train_batch_size=8,
+            per_device_eval_batch_size=12,
+            eval_accumulation_steps=100
         ),
         compute_metrics=compute_metrics,
         data_collator=default_data_collator,

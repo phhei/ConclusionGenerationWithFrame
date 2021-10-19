@@ -62,6 +62,7 @@ class StanceScore(ReferenceFreeMetric):
 
         self.include_topic = include_topic
         self.include_premise = True
+        self.premise_col = "input"
 
         logger.success("Initialized the Stance-scorer: {}", self.stance_classifier.config.architectures)
 

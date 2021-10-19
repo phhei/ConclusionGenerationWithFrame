@@ -2,6 +2,7 @@ import pathlib
 import time
 from typing import Any, Optional, Tuple, Dict, Union
 
+import deprecate.deprecation
 import loguru
 import pytorch_lightning
 import torch
@@ -61,9 +62,13 @@ class T5Trainer:
 
         root_dir = pathlib.Path(".out", "checkpoint", type(trainer_module.model).__name__, checkpoint.stem)
         ret.teacher = \
-            pytorch_lightning.Trainer(check_val_every_n_epoch=1, min_epochs=2, max_epochs=12,
-                                      log_every_n_steps=8, flush_logs_every_n_steps=16,
+            pytorch_lightning.Trainer(check_val_every_n_epoch=1,
+                                      min_epochs=2,
+                                      max_epochs=12,
+                                      log_every_n_steps=8,
+                                      flush_logs_every_n_steps=16,
                                       progress_bar_refresh_rate=1,
+                                      gpus=int(torch.cuda.is_available()),
                                       default_root_dir=str(root_dir.absolute()),
                                       # https://github.com/PyTorchLightning/pytorch-lightning/issues/5604
                                       **(dict()
@@ -389,9 +394,13 @@ class T5Trainer:
         )
         logger.debug("Base path: {}", root_dir.absolute())
         root_dir.mkdir(parents=True, exist_ok=True)
-        self.teacher = pytorch_lightning.Trainer(check_val_every_n_epoch=1, min_epochs=2, max_epochs=12,
-                                                 log_every_n_steps=8, flush_logs_every_n_steps=16,
+        self.teacher = pytorch_lightning.Trainer(check_val_every_n_epoch=1,
+                                                 min_epochs=2,
+                                                 max_epochs=12,
+                                                 log_every_n_steps=8,
+                                                 flush_logs_every_n_steps=16,
                                                  progress_bar_refresh_rate=1,
+                                                 gpus=int(torch.cuda.is_available()),
                                                  default_root_dir=str(root_dir.absolute()),
                                                  # https://github.com/PyTorchLightning/pytorch-lightning/issues/5604
                                                  **(dict()
@@ -495,8 +504,9 @@ class T5Trainer:
 
         logger.success("Test finished: {}", props_test)
 
-    def generate(self, limit=-1, min_length=2, max_length=24, cherry_picker: Optional[CherryPicker] = None) -> Dict:
-        ret = {"columns": ["input", "ground_truth", "prediction_debug", "prediction"]}
+    def generate(self, limit=-1, min_length=2, max_length=24, cherry_picker: Optional[CherryPicker] = None,
+                 comprehensive_result: bool = True) -> Dict:
+        ret = dict()
 
         if limit >= 1 and limit > len(self.test_x["input_ids"]):
             logger.warning("You have only {} samples in your test data, but you want generate for {} sample - we're "
@@ -507,6 +517,13 @@ class T5Trainer:
         else:
             logger.trace("Limit: {}", limit)
 
+        if cherry_picker is not None:
+            deprecate.deprecation.deprecation_warning("Using a cherry picker is deprecated, "
+                                                      "because it's causes a lot of recomputing. Better:"
+                                                      "use comprehensive_result: bool = True, score each line of "
+                                                      "result and have a flexible score matrix // "
+                                                      "{}".format(cherry_picker))
+
         for i, data in enumerate(
                 zip(self.test_x["input_ids"][:limit] if limit >= 1 else self.test_x["input_ids"],
                     self.test_x["attention_mask"][:limit] if limit >= 1 else self.test_x["attention_mask"],
@@ -516,65 +533,114 @@ class T5Trainer:
             sample_x, sample_x_attention, sample_x_frame_id, sample_y = data
 
             plain_input_premise = self.tokenizer.decode(token_ids=sample_x,
-                                                        skip_special_tokens=False,
+                                                        skip_special_tokens=True,
                                                         clean_up_tokenization_spaces=True)
+            plain_input_premise_debug = self.tokenizer.decode(token_ids=sample_x,
+                                                              skip_special_tokens=False,
+                                                              clean_up_tokenization_spaces=True)
             try:
-                plain_input_premise = plain_input_premise.replace(self.tokenizer.pad_token, " ").\
-                    replace(self.tokenizer.eos_token, " ").strip()
+                plain_input_premise_debug_without_padding = \
+                    plain_input_premise_debug.replace(self.tokenizer.pad_token, " ").\
+                        replace(self.tokenizer.eos_token, " ").strip()
             except TypeError:
                 logger.opt(exception=False).warning("The tokenizer \"{}\" doesn't know a padding or EOS-token",
                                                     type(self.tokenizer))
+                plain_input_premise_debug_without_padding = None
             plain_ground_truth = self.tokenizer.decode(token_ids=sample_y,
                                                        skip_special_tokens=True,
                                                        clean_up_tokenization_spaces=True)
 
-            outputs = self.model.generate(
-                input_ids=torch.unsqueeze(sample_x, dim=0),
-                attention_mask=torch.unsqueeze(sample_x_attention, dim=0),
-                max_length=max_length,
-                min_length=min_length,
-                do_sample=True,
-                num_beams=5 if cherry_picker is None else 12,
-                top_k=50,
-                top_p=.925,
-                temperature=0.75 if cherry_picker is None else 1.1,  # higher temperature: more word diversity
-                no_repeat_ngram_size=2,
-                encoder_no_repeat_ngram_size=-1,
-                length_penalty=1.2,
-                repetition_penalty=1.25,
-                return_dict_in_generate=True,
-                remove_invalid_values=True,
-                num_return_sequences=1 if cherry_picker is  None else 8,
-                pad_token_id=self.tokenizer.pad_token_id,
-                eos_token_id=self.tokenizer.eos_token_id,
-                early_stopping=True,
-                output_scores=True,
-                output_attentions=False,
-                output_hidden_states=False,
-                decoder_start_token_id=self.tokenizer.pad_token_id,
-                forced_eos_token_id=None,
-                **({"frame_ids": torch.unsqueeze(sample_x_frame_id, dim=0)}
-                   if isinstance(self.model, FrameBiasedT5ForConditionalGeneration) else dict())
-            )
+            ret["test_{}".format(i)] = {
+                "input_without_special_tokens": plain_input_premise,
+                "input_debug": plain_input_premise_debug,
+                "input": plain_input_premise_debug
+                if plain_input_premise_debug_without_padding is None else plain_input_premise_debug_without_padding,
+                "ground_truth": plain_ground_truth,
 
-            if cherry_picker is None:
-                output_ids = outputs.sequences[0]
+            }
 
-                plain_prediction = self.tokenizer.decode(token_ids=output_ids,
-                                                         skip_special_tokens=True,
-                                                         clean_up_tokenization_spaces=True)
-                plain_prediction_debug = self.tokenizer.decode(token_ids=output_ids,
-                                                               skip_special_tokens=False,
-                                                               clean_up_tokenization_spaces=False)
+            if comprehensive_result or cherry_picker is None:
+                outputs_low_temp = self.model.generate(
+                    input_ids=torch.unsqueeze(sample_x, dim=0),
+                    attention_mask=torch.unsqueeze(sample_x_attention, dim=0),
+                    max_length=max_length,
+                    min_length=min_length,
+                    do_sample=True,
+                    num_beams=5,
+                    top_k=50,
+                    top_p=.925,
+                    temperature=0.75,  # higher temperature: more word diversity
+                    no_repeat_ngram_size=2,
+                    encoder_no_repeat_ngram_size=-1,
+                    length_penalty=1.2,
+                    repetition_penalty=1.25,
+                    return_dict_in_generate=True,
+                    remove_invalid_values=True,
+                    num_return_sequences=1,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                    eos_token_id=self.tokenizer.eos_token_id,
+                    early_stopping=True,
+                    output_scores=True,
+                    output_attentions=False,
+                    output_hidden_states=False,
+                    decoder_start_token_id=self.tokenizer.pad_token_id,
+                    forced_eos_token_id=None,
+                    **({"frame_ids": torch.unsqueeze(sample_x_frame_id, dim=0)}
+                       if isinstance(self.model, FrameBiasedT5ForConditionalGeneration) else dict())
+                )
             else:
-                logger.trace("Oh, look, there is a cherry-picker: {}", cherry_picker)
+                outputs_low_temp = None
+            if comprehensive_result or cherry_picker is not None:
+                outputs_high_temp = self.model.generate(
+                    input_ids=torch.unsqueeze(sample_x, dim=0),
+                    attention_mask=torch.unsqueeze(sample_x_attention, dim=0),
+                    max_length=max_length,
+                    min_length=min_length,
+                    do_sample=True,
+                    num_beams=12,
+                    top_k=50,
+                    top_p=.925,
+                    temperature=1.1,  # higher temperature: more word diversity
+                    no_repeat_ngram_size=2,
+                    encoder_no_repeat_ngram_size=-1,
+                    length_penalty=1.2,
+                    repetition_penalty=1.25,
+                    return_dict_in_generate=True,
+                    remove_invalid_values=True,
+                    num_return_sequences=8,
+                    pad_token_id=self.tokenizer.pad_token_id,
+                    eos_token_id=self.tokenizer.eos_token_id,
+                    early_stopping=True,
+                    output_scores=True,
+                    output_attentions=False,
+                    output_hidden_states=False,
+                    decoder_start_token_id=self.tokenizer.pad_token_id,
+                    forced_eos_token_id=None,
+                    **({"frame_ids": torch.unsqueeze(sample_x_frame_id, dim=0)}
+                       if isinstance(self.model, FrameBiasedT5ForConditionalGeneration) else dict())
+                )
+            else:
+                outputs_high_temp = None
 
-                logger.debug("Select the best one out of {} prediction sequences", len(outputs.sequences))
+            if outputs_low_temp is not None:
+                output_ids = outputs_low_temp.sequences[0]
+
+                ret["test_{}".format(i)]["best_beam_prediction"] = \
+                    self.tokenizer.decode(token_ids=output_ids, skip_special_tokens=True,
+                                          clean_up_tokenization_spaces=True)
+                ret["test_{}".format(i)]["best_beam_prediction_debug"] = \
+                    self.tokenizer.decode(token_ids=output_ids, skip_special_tokens=False,
+                                          clean_up_tokenization_spaces=False)
+            if outputs_high_temp is not None:
+                if cherry_picker is not None:
+                    logger.trace("Oh, look, there is a cherry-picker: {}", cherry_picker)
+
+                    logger.debug("Select the best one out of {} prediction sequences", len(outputs_high_temp.sequences))
                 plain_premise_predictions = []
                 plain_predictions_debug = []
-                for seq in outputs.sequences:
+                for seq_id, seq in enumerate(outputs_high_temp.sequences):
                     plain_premise_predictions.append(
-                        (plain_input_premise,
+                        (plain_input_premise_debug,
                          self.tokenizer.decode(token_ids=seq, skip_special_tokens=True,
                                                clean_up_tokenization_spaces=True))
                     )
@@ -582,25 +648,41 @@ class T5Trainer:
                         self.tokenizer.decode(token_ids=seq, skip_special_tokens=False,
                                               clean_up_tokenization_spaces=False)
                     )
-                logger.trace("Collected {} predictions: {}", len(plain_premise_predictions),
-                             " +++ ".join(map(lambda p: p[-1], plain_premise_predictions)))
-                plain_prediction, pos = \
-                    cherry_picker.cherry_picking(generated_sequences=plain_premise_predictions,
-                                                 reference=plain_ground_truth)
-                plain_prediction_debug = plain_predictions_debug[pos]
+                    if comprehensive_result:
+                        ret["test_{}".format(i)]["prediction_{}".format(seq_id)] = \
+                            self.tokenizer.decode(token_ids=seq, skip_special_tokens=True,
+                                                  clean_up_tokenization_spaces=True)
+                        ret["test_{}".format(i)]["prediction_debug_{}".format(seq_id)] = plain_predictions_debug[-1]
+                if cherry_picker is not None:
+                    logger.trace("Collected {} predictions: {}", len(plain_premise_predictions),
+                                 " +++ ".join(map(lambda p: p[-1], plain_premise_predictions)))
+                    selected_prediction, pos = \
+                        cherry_picker.cherry_picking(generated_sequences=plain_premise_predictions,
+                                                     reference=plain_ground_truth)
+                    selected_prediction_debug = plain_predictions_debug[pos]
+                    ret["test_{}".format(i)]["selected_prediction"] = selected_prediction
+                    ret["test_{}".format(i)]["selected_prediction_debug"] = selected_prediction_debug
+                    ret["test_{}".format(i)]["selected_prediction_pos"] = pos
 
-            logger.debug("Predicting \"{}\" --> \"{}\"", plain_prediction_debug, plain_prediction)
-            if plain_prediction == plain_ground_truth:
-                logger.success("We predict the ground truth \"{}\" -> \"{}\"", plain_input_premise, plain_ground_truth)
+            final_prediction_debug = ret["test_{}".format(i)].get("selected_prediction_debug",
+                                                                  ret["test_{}".format(i)].get("plain_prediction_debug",
+                                                                                               "n/a"))
+            final_prediction = ret["test_{}".format(i)].get("selected_prediction",
+                                                            ret["test_{}".format(i)].get("plain_prediction", "n/a"))
+            logger.debug("Predicting \"{}\" --> \"{}\"", final_prediction_debug, final_prediction)
+            if final_prediction == plain_ground_truth:
+                logger.success("We predict the ground truth \"{}\" -> \"{}\"", plain_input_premise_debug,
+                               plain_ground_truth)
             else:
-                logger.warning("\"{}\": Should be \"{}\", but is \"{}\"", plain_input_premise, plain_ground_truth,
-                               plain_prediction)
+                logger.warning("\"{}\": Should be \"{}\", but is \"{}\"", plain_input_premise_debug, plain_ground_truth,
+                               final_prediction)
 
-            ret["test_{}".format(i)] = {
-                "input": plain_input_premise,
-                "ground_truth": plain_ground_truth,
-                "prediction_debug": plain_prediction_debug,
-                "prediction": plain_prediction
-            }
+        try:
+            key = list(ret.keys())[0]
+            logger.trace("Retrieve the final columns from key \"{}\"", key)
+            ret.update({"columns": list(ret[key].keys())})
+        except IndexError:
+            logger.opt(exception=True).error("Your resulting dictionary is empty, unfortunately. "
+                                             "Please try a larger test set / limit-param ({})", limit)
 
         return ret
