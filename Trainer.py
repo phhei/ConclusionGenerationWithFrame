@@ -665,16 +665,16 @@ class T5Trainer:
                     ret["test_{}".format(i)]["selected_prediction_pos"] = pos
 
             final_prediction_debug = ret["test_{}".format(i)].get("selected_prediction_debug",
-                                                                  ret["test_{}".format(i)].get("plain_prediction_debug",
+                                                                  ret["test_{}".format(i)].get("best_beam_prediction_debug",
                                                                                                "n/a"))
             final_prediction = ret["test_{}".format(i)].get("selected_prediction",
-                                                            ret["test_{}".format(i)].get("plain_prediction", "n/a"))
+                                                            ret["test_{}".format(i)].get("best_beam_prediction", "n/a"))
             logger.debug("Predicting \"{}\" --> \"{}\"", final_prediction_debug, final_prediction)
             if final_prediction == plain_ground_truth:
-                logger.success("We predict the ground truth \"{}\" -> \"{}\"", plain_input_premise_debug,
+                logger.success("We predict the ground truth \"{}\" -> \"{}\"", plain_input_premise,
                                plain_ground_truth)
             else:
-                logger.warning("\"{}\": Should be \"{}\", but is \"{}\"", plain_input_premise_debug, plain_ground_truth,
+                logger.warning("\"{}\": Should be \"{}\", but is \"{}\"", plain_input_premise, plain_ground_truth,
                                final_prediction)
 
         try:

@@ -193,7 +193,7 @@ def score_matrix(ret_dict: Dict[str, Dict[str, str]],
                     for metric_key, metric_value in metric_dict.items():
                         logger.trace("Calculated \"{}\"", metric_key)
                         if isinstance(metric_value, int) or isinstance(metric_value, float):
-                            logger.debug("Metric \"{}\" has a 1 depth: {}", metric_key, metric_value)
+                            logger.debug("Metric \"{}\" has a depth of 1: {}", metric_key, metric_value)
                             additional_data["{}_{}".format(column, metric_key)] = metric_value
                         elif isinstance(metric_value, Dict):
                             additional_data.update({

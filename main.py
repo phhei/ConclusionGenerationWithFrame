@@ -408,7 +408,7 @@ if __name__ == '__main__':
     logger.success("Generated {} samples ({})", len(df), "|".join(df.columns))
     if root_save_path is not None:
         root_save_path.mkdir(parents=True, exist_ok=True)
-        df.to_csv(path_or_buf=root_save_path.joinpath("predictions.csv"), index_label="test_ID")
+        df.to_csv(path_or_buf=root_save_path.joinpath("predictions.csv"), index_label="test_ID", encoding="utf-8")
         sql_con = sqlite3.connect(database=str(root_save_path.joinpath("predictions.sql").absolute()))
         df.to_sql(name="Predictions", con=sql_con, index_label="Test_ID", if_exists="replace")
         pandas.DataFrame.from_records(
@@ -419,7 +419,8 @@ if __name__ == '__main__':
         score_matrix(ret_dict=generated_data, evaluation_instances=metrics_list)
         columns_extended = list(generated_data[list(generated_data.keys())[0]].keys())
         df = pandas.DataFrame.from_dict(data=generated_data, orient="index", columns=columns_extended)
-        df.to_csv(path_or_buf=root_save_path.joinpath("predictions_scores.csv"), index_label="test_ID")
+        df.to_csv(path_or_buf=root_save_path.joinpath("predictions_scores.csv"), index_label="test_ID",
+                  encoding="utf-8")
         sql_con = sqlite3.connect(database=str(root_save_path.joinpath("predictions_scores.sql").absolute()))
         df.to_sql(name="Predictions", con=sql_con, index_label="Test_ID", if_exists="replace")
         pandas.DataFrame.from_records(
@@ -427,7 +428,7 @@ if __name__ == '__main__':
         ).to_sql(name="Data", con=sql_con, index_label="Test_ID", if_exists="replace")
         sql_con.close()
 
-        logger.success("Succesfully saved the results of {} samples here in this dictionary: {}", len(df),
+        logger.success("Successfully saved the results of {} samples here in this dictionary: {}", len(df),
                        root_save_path.absolute())
     else:
         logger.warning("Don't save the {} generations because you don't define a saving place", len(generated_data))

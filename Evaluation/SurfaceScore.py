@@ -21,7 +21,7 @@ class SurfaceHint(ReferenceFreeMetric):
         stopwords_set = set(stopwords.words("english"))
     except LookupError:
         logger.opt(exception=False).warning("We must download the stopwords first")
-        if nltk.download("english"):
+        if nltk.download("stopwords"):
             sw = set(stopwords.words("english"))
             logger.success("Downloaded the English-nltk-package and found {} stopwords", len(sw))
             stopwords_set = sw

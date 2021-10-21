@@ -1,6 +1,7 @@
 import pathlib
 from typing import List, Tuple, Union
 
+import nltk
 import torch
 from loguru import logger
 from sacrerouge.data import MetricsDict
@@ -55,9 +56,25 @@ class GRUENMetric(ReferenceFreeMetric):
                     logger.trace("Concatenated to: \"{}\"", summary)
                 else:
                     logger.warning("Expected a list (premise, conclusion), but got only 1 part: \"{}\"", summary)
-                cd = get_gruen(candidates=[summary], tokenizer_lm=self.tokenizer_lm, model_lm=self.model_lm,
-                               cola_config=self.cola_config, cola_tokenizer=self.cola_tokenizer,
-                               cola_model=self.cola_model)[0]
+                while True:
+                    try:
+                        cd = get_gruen(candidates=[summary], tokenizer_lm=self.tokenizer_lm, model_lm=self.model_lm,
+                                       cola_config=self.cola_config, cola_tokenizer=self.cola_tokenizer,
+                                       cola_model=self.cola_model)[0]
+                        break
+                    except LookupError:
+                        logger.opt(exception=False).warning("You have possibly not downloaded required python-packages."
+                                                            " Let's change this!")
+                        if nltk.download("punkt"):
+                            logger.success("OK, downloaded the missing part - try it again")
+                        else:
+                            logger.error("We're not able to download the missing dependency - we're sorry.")
+                            cd = 0.
+                            break
+                    except Exception:
+                        logger.opt(exception=True).critical("Problemns with the GRUEN-library")
+                        cd = 0.
+                        break
                 d = {
                     "GRUEN": cd
                 }
