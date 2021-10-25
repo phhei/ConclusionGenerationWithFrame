@@ -1,6 +1,6 @@
 import pandas
 from pathlib import Path
-from typing import List
+from typing import List, Optional, Dict, Union
 from loguru import logger
 
 from sklearn.linear_model import LinearRegression
@@ -10,11 +10,125 @@ from pprint import pprint
 from const import AVAILABLE_SCORES
 
 
-predictions_scores_csv: Path = Path("..", ".out", "pytorch_lightning", "FrameBiasedT5ForConditionalGeneration",
-                                    "128-24", "version_22", "predictions_scores.csv")
+predictions_scores_csv: Path = Path(
+    "..",
+    ".out/pytorch_lightning/FrameBiasedT5ForConditionalGeneration/128-24/smoothing0.2/tdf0.15/frame16/t5-large-res/predictions_scores.csv"
+)
 reference_scores: List[str] = ["rouge1", "rougeL", "bertscore_f1"]
 exclude_scores: List[str] = ["rouge", "bertscore_precision", "bertscore_recall", "bertscore_f1"]
 save_path: Path = predictions_scores_csv.parent.joinpath("linear_regression_cherry_picker", "-".join(reference_scores))
+
+
+def average_output(f_predictions_scores_csv: Path = predictions_scores_csv,
+                   cherry_picked_files_dir: Optional[Path] = save_path,
+                   f_reference_scores: Optional[List[str]] = None,
+                   training_samples: Optional[Union[int, float]] = .5) -> Dict[str, float]:
+    if f_reference_scores is None:
+        f_reference_scores = reference_scores
+    df_main = pandas.read_csv(filepath_or_buffer=str(f_predictions_scores_csv.absolute()),
+                              encoding="utf-8", index_col="test_ID")
+    logger.info("Read {} samples from \"{}\"", len(df_main), f_predictions_scores_csv.name)
+    if training_samples is not None:
+        if isinstance(training_samples, float):
+            df_main = df_main[int(len(df_main)*training_samples)+1:]
+        else:
+            df_main = df_main[training_samples+1:]
+        logger.warning("Some of your test samples were used to train this Cherry-Picker! "
+                       "Discard them to prevent spoiling! {} remain", len(df_main))
+
+    f_ret = dict()
+    try:
+        f_ret.update(
+            {
+                "best_beam_avg_{}".format(r):
+                    round(df_main["best_beam_prediction_{}".format(r)].mean(skipna=True), 5)
+                for r in f_reference_scores
+            }
+        )
+        f_ret.update(
+            {
+                "worst_avg_{}".format(r):
+                    round(df_main[[c for c in df.columns if r in c]].min(axis="columns", skipna=True, numeric_only=True)
+                          .mean(skipna=True), 4)
+                for r in f_reference_scores
+            }
+        )
+        f_ret.update(
+            {
+                "optimal_avg_{}".format(r):
+                    round(df_main[[c for c in df.columns if r in c]].max(axis="columns", skipna=True, numeric_only=True)
+                          .mean(skipna=True), 4)
+                for r in f_reference_scores
+            }
+        )
+        f_ret.update(
+            {
+                "best_beam_std_{}".format(r):
+                    round(df_main["best_beam_prediction_{}".format(r)].std(skipna=True), 5)
+                for r in f_reference_scores
+            }
+        )
+        f_ret.update(
+            {
+                "optimal_std_{}".format(r):
+                    round(df_main[[c for c in df.columns if r in c]].max(axis="columns", skipna=True, numeric_only=True)
+                          .std(skipna=True), 4)
+                for r in f_reference_scores
+            }
+        )
+    except KeyError:
+        logger.opt(exception=True).error("Can't calculated the average beam score. There are two possible reasons: "
+                                         "1) malformed prediction_score. Are you sure you already applied the metrics "
+                                         "on it? "
+                                         "2) Invalid reference scores {}", reference_scores)
+
+    logger.success("Successfully read through \"{}\": {}", f_predictions_scores_csv.name, f_ret)
+
+    if cherry_picked_files_dir is not None:
+        for file in cherry_picked_files_dir.glob(pattern="*.csv"):
+            logger.info("Found a cherry-picked file: {}", file)
+            logger.trace("Try to read \"{}\"", file.absolute())
+            df_c = pandas.read_csv(filepath_or_buffer=str(file.absolute()),
+                                   encoding="utf-8", index_col="test_ID")
+            logger.debug("\"{}\" contains {} samples", file.stem, len(df_c))
+            if training_samples is not None:
+                if isinstance(training_samples, float):
+                    df_c = df_c[int(len(df_c) * training_samples) + 1:]
+                else:
+                    df_c = df_c[training_samples + 1:]
+            try:
+                f_ret["{} --> {}".format(file.parent.name, file.stem)] = {
+                    "selected_avg_{}".format(r): round(df_c[r].mean(skipna=True), 4)
+                    for r in f_reference_scores if r in file.parent.name
+                }
+                f_ret["{} --> {}".format(file.parent.name, file.stem)].update({
+                    "selected_std_{}".format(r): round(df_c[r].std(skipna=True), 4)
+                    for r in f_reference_scores if r in file.parent.name
+                })
+                logger.debug("Adding {} stats from \"{}\"",
+                             len(f_ret["{} --> {}".format(file.parent.name, file.stem)]), file.stem)
+            except KeyError:
+                logger.opt(exception=True).warning("\"{}\" is probable no cherry-picked file - ignore...", file.name)
+
+    logger.success("Finished creating a average-stat with {} stats", len(f_ret))
+
+    try:
+        with f_predictions_scores_csv.parent.joinpath("avg_stats.txt").open(mode="w", encoding="utf-8") as avg_writer:
+            pprint(
+                object=f_ret,
+                stream=avg_writer,
+                sort_dicts=True,
+                depth=2,
+                indent=4,
+                compact=False,
+                width=60
+            )
+    except IOError:
+        pprint(object=f_ret, compact=True, sort_dicts=True)
+
+    logger.trace("Return stats: {}", f_ret)
+    return f_ret
+
 
 if __name__ == "__main__":
     logger.info("Let's analyse \"{}\"", predictions_scores_csv)
@@ -98,12 +212,12 @@ if __name__ == "__main__":
     logger.success("Successfully loaded {} training samples!", len(X))
 
     model = LinearRegression(fit_intercept=False, copy_X=True, positive=False)
-    X_train = X[:int(len(X)*.8)]
+    X_train = X[:int(len(X)*.5)]
     X_train, norms = normalize(X=X_train, norm="max", axis=0, copy=True, return_norm=True)
     logger.info("We normalized the training data with following norms: {}", norms)
-    X_test = [[feature/norm for feature, norm in zip(sample, norms)] for sample in X[int(len(X)*.8):]]
-    Y_train = Y[:int(len(Y)*.8)]
-    Y_test = Y[int(len(Y)*.8):]
+    X_test = [[feature/norm for feature, norm in zip(sample, norms)] for sample in X[int(len(X)*.5):]]
+    Y_train = Y[:int(len(Y)*.5)]
+    Y_test = Y[int(len(Y)*.5):]
     logger.info("Initializes a linear model {}, will train with {} samples (out of {})", model, len(X_train), len(X))
 
     logger.success("Trained: {}", model.fit(X=X_train, y=Y_train))
@@ -115,16 +229,20 @@ if __name__ == "__main__":
         except IndexError:
             logger.opt(exception=True).info("Pending param {} -> {}", i, param)
     save_path.mkdir(parents=True, exist_ok=True)
-    with save_path.joinpath("stats.txt").open(mode="w", encoding="utf-8") as dump:
-        pprint(
-            object=model_dict,
-            stream=dump,
-            sort_dicts=True,
-            indent=1,
-            compact=False,
-            width=100
-        )
-        logger.debug("Saved stats ({}) to \"{}\"", len(model_dict), dump.name)
+
+    try:
+        with save_path.joinpath("stats.txt").open(mode="w", encoding="utf-8") as dump:
+            pprint(
+                object=model_dict,
+                stream=dump,
+                sort_dicts=True,
+                indent=1,
+                compact=False,
+                width=100
+            )
+            logger.debug("Saved stats ({}) to \"{}\"", len(model_dict), dump.name)
+    except IOError:
+        pprint(object=model_dict, compact=True)
 
     logger.info("OK, let's cherry-pick with \"{}\"", model)
     ret = dict()
@@ -155,7 +273,7 @@ if __name__ == "__main__":
             logger.opt(exception=True).error("Malformed input...")
     logger.success("Got {} predictions/ lines", len(ret))
     try:
-        csv_path: Path = save_path.joinpath("cherry_picked.csv")
+        csv_path: Path = save_path.joinpath("cherry_picked_without-{}.csv".format("".join(exclude_scores)))
         pandas.DataFrame.from_dict(data=ret, orient="index").to_csv(
             path_or_buf=str(csv_path.absolute()),
             encoding="utf-8",
@@ -173,3 +291,5 @@ if __name__ == "__main__":
             compact=False,
             sort_dicts=True
         )
+
+    average_output()

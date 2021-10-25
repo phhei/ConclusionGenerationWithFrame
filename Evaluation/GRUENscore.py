@@ -1,3 +1,4 @@
+import os
 import pathlib
 from typing import List, Tuple, Union
 
@@ -71,8 +72,19 @@ class GRUENMetric(ReferenceFreeMetric):
                             logger.error("We're not able to download the missing dependency - we're sorry.")
                             cd = 0.
                             break
+                    except OSError:
+                        logger.opt(exception=True).warning("The spacy-language-model is missing? We will fix this, "
+                                                           "wait a second!")
+                        res_code = os.system("python -m spacy download en_core_web_md")
+                        if res_code != 0:
+                            logger.error("Were not able to execute \"python -m spacy download en_core_web_md\" ({})",
+                                         res_code)
+                            break
+                        else:
+                            logger.debug("If the problem was the spacy.model and NOT a unsatisfied requirements.txt, "
+                                         "we can continue now :)")
                     except Exception:
-                        logger.opt(exception=True).critical("Problemns with the GRUEN-library")
+                        logger.opt(exception=True).critical("Problems with the GRUEN-library")
                         cd = 0.
                         break
                 d = {

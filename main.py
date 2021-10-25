@@ -1,5 +1,5 @@
 import math
-import pathlib
+from pathlib import Path
 import sqlite3
 import sys
 from typing import Tuple, List, Union, Optional
@@ -22,19 +22,22 @@ from Transformer import FrameBiasedT5ForConditionalGeneration
 from const import FRAME_START_TOKEN, FRAME_END_TOKEN, TOPIC_START_TOKEN, TOPIC_END_TOKEN
 
 #INPUT params
-datasets: List[pathlib.Path] = [pathlib.Path("Webis-argument-framing.csv")]
-frame_datasets: List[Tuple[Optional[pathlib.Path], Tuple[str]]] = \
+datasets: List[Path] = [Path("Webis-argument-framing.csv")]
+frame_datasets: List[Tuple[Optional[Path], Tuple[str]]] = \
     [(None, ("frame_index", "input_ids")),
      (None, ("frame_index", "Yinput_ids")),
-     (pathlib.Path("frame_sets", "frame_datasets", "Media-frames-immigrationsamesexsmoking.csv"),
+     (Path("frame_sets", "frame_datasets", "Media-frames-immigrationsamesexsmoking.csv"),
       ("frame", "conclusion"))
      ]
 limit_samples: int = -1
 train_val_test_topic_distinct: bool = limit_samples < 0 or limit_samples >= 200
 max_length_premise: int = 128
 max_length_conclusion: int = 24
-include_frame: bool = True
+include_frame: bool = \
+    sys.argv[sys.argv.index("include_frame") + 1].upper() == "TRUE" if "include_frame" in sys.argv else True
 frame_set: Optional[str] = sys.argv[sys.argv.index("frame_set")+1] if "frame_set" in sys.argv else None # media_frames
+add_ecologic_frame: Optional[bool] = \
+    sys.argv[sys.argv.index("add_ecologic_frame") + 1].upper() == "TRUE" if "add_ecologic_frame" in sys.argv else None
 include_topic: bool = \
     sys.argv[sys.argv.index("include_topic") + 1].upper() == "TRUE" if "include_topic" in sys.argv else True
 
@@ -51,16 +54,20 @@ if frame_set is None:
     model: transformers.PreTrainedModel = transformers.T5ForConditionalGeneration.from_pretrained("t5-large")
 else:
     model: str = "t5-large"
-checkpoint: Optional[pathlib.Path] = None
+checkpoint: Optional[Path] = Path(sys.argv[sys.argv.index("checkpoint")+1]) if "checkpoint" in sys.argv else None
 # checkpoint: Optional[pathlib.Path] = pathlib.Path(".out", "pytorch_lightning", "T5ForConditionalGeneration",
 #                                                  "128-24", "lightning_logs", "version_3", "checkpoints",
 #                                                  "epoch=7-step=2471.ckpt")
 # checkpoint = pathlib.Path(".out", "pytorch_lightning", "T5ForConditionalGeneration", "128-24", "smoothing0.2", "tdf0.15", "lightning_logs", "version_0", "checkpoints", "epoch=11-step=3707.ckpt")
 
 # INFERENCE parameters
+skip_inference: bool = \
+    sys.argv[sys.argv.index("skip_inference") + 1].upper() == "TRUE" if "skip_inference" in sys.argv else False
 preferred_model_for_frame_identifier: Optional[str] = "distilroberta-base"
-preferred_model_for_stance_identifier: Optional[str] = pathlib.Path("stance_classifier", "microsoft",
-                                                                    "deberta-base-mnli", "with topic", "152")
+preferred_model_for_stance_identifier: Optional[str] = \
+    Path("stance_classifier", "microsoft", "deberta-base-mnli", "with topic", "152") \
+        if include_topic else \
+        Path("stance_classifier", "microsoft", "deberta-base-mnli", "without topic", "152")
 preferred_tokenizer_for_stance_identifier: Optional[str] = "microsoft/deberta-base-mnli"
 samples_to_be_generate: int = -1
 
@@ -207,9 +214,10 @@ if __name__ == '__main__':
     if frame_set is not None:
         cluster_frame = FrameSet(frame_set=frame_set)
 
-        if "media_frames" not in cluster_frame.name:
-            logger.info("You considered the frame set \"{}\" - therefore, let's consider the ecologic frame, too",
-                        cluster_frame)
+        if (add_ecologic_frame is None and len(cluster_frame) <= 10) or add_ecologic_frame:
+            logger.info("You considered the frame set \"{}\" with {} frames - "
+                        "therefore, let's consider the ecologic frame, too",
+                        cluster_frame.name, len(cluster_frame))
             cluster_frame.add_ecology_frame()
     else:
         cluster_frame = None
@@ -325,8 +333,15 @@ if __name__ == '__main__':
     if checkpoint is None:
         root_save_path = trainer.train()
     else:
-        root_save_path = checkpoint.parent.parent
+        root_save_path = checkpoint.parent.parent.parent.parent.joinpath(checkpoint.parent.parent.name)
     trainer.test()
+
+    if skip_inference:
+        logger.warning("You want to skip the inference, hence: no generations! Quiet the app here. If you want to "
+                       "continue, please call this app again with a \"checkpoint\"-param pointing to \"{}\"",
+                       trainer.trainer_module.checkpoint.best_model_path
+                       if trainer.trainer_module is not None else "NOT SAVED")
+        exit(0)
 
     logger.trace("###################################################################################################")
     logger.trace("####################################### Initializes Metrics #######################################")
@@ -364,8 +379,8 @@ if __name__ == '__main__':
                                  for index, content in
                                  pandas.read_csv(
                                      filepath_or_buffer=str(
-                                         pathlib.Path("frame_sets", "frame_datasets",
-                                                      "Media-frames-immigrationsamesexsmoking.csv").absolute()
+                                         Path("frame_sets", "frame_datasets",
+                                              "Media-frames-immigrationsamesexsmoking.csv").absolute()
                                      ),
                                      delimiter="|",
                                      verbose=False,

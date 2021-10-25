@@ -75,7 +75,7 @@ class StanceScore(ReferenceFreeMetric):
                              summary[1])
 
                 topic = None
-                if self.include_premise:
+                if self.include_topic:
                     logger.trace("OK, let's retrieve the topic out of \"{}\"", summary[0])
                     try:
                         topic = summary[0][summary[0].index(TOPIC_START_TOKEN) + len(TOPIC_START_TOKEN):

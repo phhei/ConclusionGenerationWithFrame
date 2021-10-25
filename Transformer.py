@@ -22,7 +22,10 @@ def post_process_out(out: Seq2SeqLMOutput, return_dict: bool):
 class FrameBiasedT5ForConditionalGeneration(T5ForConditionalGeneration):
     def __init__(self, config, frame_dict: Dict[int, Tensor], fast: bool = True, sequence_length: Optional[int] = None):
         super().__init__(config)
-        self.frame_dict = frame_dict
+        if torch.cuda.device_count() == 1:
+            logger.info("You're using the (1) GPU - hence we must assign all {} tensors of the frame-dict to the GPU.",
+                        len(frame_dict))
+            self.frame_dict = {k: tensor.cuda() for k, tensor in frame_dict.items()}
         logger.info("Received a frame_dict, containing {} frames", len(frame_dict))
         if -1 not in frame_dict:
             logger.warning("There is no default (fallback) frame (-1) in the frame_dict included, only {}",
@@ -64,16 +67,23 @@ class FrameBiasedT5ForConditionalGeneration(T5ForConditionalGeneration):
                            "T5ForConditionalGeneration")
             return post_process_out(out=out, return_dict=return_dict)
         else:
+            def move_to_same_device(tensor: Tensor) -> Tensor:
+                if torch.cuda.device_count() > 1:
+                    logger.debug("You're using {} GPUs - hence, we must ensure that all tensors are in the same device!",
+                                 torch.cuda.device_count())
+                    return tensor.to(out.logits.device)
+                return tensor
+
             logger.trace("Fetched following frame-ids: {}", frame_ids)
             post_scaled_lm = 0.5 * self.softmax_frame_layer(out.logits) if self.fast else \
                 self.sig_frame_layer(self.lin_frame_layer(out.logits))
             if isinstance(frame_ids, int):
-                multiplication = self.frame_dict.get(frame_ids, self.frame_dict.get(-1))
+                multiplication = move_to_same_device(self.frame_dict.get(frame_ids, self.frame_dict.get(-1)))
                 if len(post_scaled_lm.shape) > 1:
                     multiplication = multiplication.repeat(*post_scaled_lm.shape[:-1], 1)
             elif isinstance(frame_ids, torch.Tensor):
                 if frame_ids.shape.numel() == 1:
-                    multiplication = self.frame_dict.get(frame_ids.item(), self.frame_dict.get(-1))
+                    multiplication = move_to_same_device(self.frame_dict.get(frame_ids.item(), self.frame_dict.get(-1)))
                     if len(post_scaled_lm.shape) > 1:
                         multiplication = multiplication.repeat(*post_scaled_lm.shape[:-1], 1)
                 else:
@@ -83,9 +93,11 @@ class FrameBiasedT5ForConditionalGeneration(T5ForConditionalGeneration):
 
                     if self.sequence_length is not None and post_scaled_lm.shape[1] == self.sequence_length:
                         multiplication = \
-                            torch.stack(
-                                [self.frame_dict_sequence.get(i.item(), self.frame_dict_sequence.get(-1))
-                                 for i in frame_ids]
+                            move_to_same_device(
+                                torch.stack(
+                                    [self.frame_dict_sequence.get(i.item(), self.frame_dict_sequence.get(-1))
+                                     for i in frame_ids]
+                                )
                             )
                     else:
                         if self.sequence_length is not None:
@@ -93,10 +105,12 @@ class FrameBiasedT5ForConditionalGeneration(T5ForConditionalGeneration):
                                            "Expected a sequence length of {}, but shape is {}", self.sequence_length,
                                            post_scaled_lm.shape)
                         multiplication = \
-                            torch.stack(
-                                [self.frame_dict.get(i.item(),
-                                                     self.frame_dict.get(-1)).repeat(*post_scaled_lm.shape[1:-1], 1)
-                                 for i in frame_ids]
+                            move_to_same_device(
+                                torch.stack(
+                                    [self.frame_dict.get(i.item(),
+                                                         self.frame_dict.get(-1)).repeat(*post_scaled_lm.shape[1:-1], 1)
+                                     for i in frame_ids]
+                                )
                             )
                     logger.trace("Successfully stacked the frame multiplication tensor: {} (out of frames: {})",
                                  multiplication.shape, frame_ids)

@@ -68,13 +68,18 @@ class T5Trainer:
                                       log_every_n_steps=8,
                                       flush_logs_every_n_steps=16,
                                       progress_bar_refresh_rate=1,
-                                      gpus=int(torch.cuda.is_available()),
+                                      gpus=torch.cuda.device_count(),
+                                      #https://github.com/pytorch/pytorch/issues/40497
+                                      #precision=16 if torch.cuda.is_available() else 32,
                                       default_root_dir=str(root_dir.absolute()),
-                                      # https://github.com/PyTorchLightning/pytorch-lightning/issues/5604
-                                      **(dict()
-                                         if isinstance(trainer_module.model, FrameBiasedT5ForConditionalGeneration) else
-                                         {"num_processes": 2,
-                                          "plugins": DDPPlugin(find_unused_parameters=True)}))
+                                      max_time={"days": 1},
+                                      **({"strategy": DDPPlugin(
+                                          gradient_as_bucket_view=not isinstance(trainer_module.model,
+                                                                                 FrameBiasedT5ForConditionalGeneration),
+                                          find_unused_parameters=False)
+                                         }
+                                         if torch.cuda.device_count() > 1 else
+                                         dict()))
 
         return ret
 
@@ -400,13 +405,18 @@ class T5Trainer:
                                                  log_every_n_steps=8,
                                                  flush_logs_every_n_steps=16,
                                                  progress_bar_refresh_rate=1,
-                                                 gpus=int(torch.cuda.is_available()),
+                                                 gpus=torch.cuda.device_count(),
+                                                 #https://github.com/pytorch/pytorch/issues/40497
+                                                 #precision=16 if torch.cuda.is_available() else 32,
+                                                 max_time={"days": 1, "hours": 10},
                                                  default_root_dir=str(root_dir.absolute()),
-                                                 # https://github.com/PyTorchLightning/pytorch-lightning/issues/5604
-                                                 **(dict()
-                                                    if isinstance(self.model, FrameBiasedT5ForConditionalGeneration) else
-                                                    {"num_processes": 2,
-                                                     "plugins": DDPPlugin(find_unused_parameters=True)}),
+                                                 **({"strategy": DDPPlugin(
+                                                     gradient_as_bucket_view=not isinstance(self.model,
+                                                                                            FrameBiasedT5ForConditionalGeneration),
+                                                     find_unused_parameters=False)
+                                                    }
+                                                    if torch.cuda.device_count() > 1 else
+                                                    dict()),
                                                  **(additional_training_args or {}))
         logger.debug("Initialize: {}, {}", self.trainer_module, self.teacher)
 
@@ -426,12 +436,18 @@ class T5Trainer:
                                                                             self.train_x["attention_mask"],
                                                                             self.train_x["frame_index"],
                                                                             self.train_y["input_ids"]),
-                                                      batch_size=16, shuffle=True),
+                                                      batch_size=4 if torch.cuda.is_available() else 16,
+                                                      shuffle=True,
+                                                      num_workers=2,
+                                                      pin_memory=torch.cuda.is_available()),
                          val_dataloaders=DataLoader(dataset=TensorDataset(self.val_x["input_ids"],
                                                                           self.val_x["attention_mask"],
                                                                           self.val_x["frame_index"],
                                                                           self.val_y["input_ids"]),
-                                                    batch_size=24, shuffle=False))
+                                                    batch_size=4 if torch.cuda.is_available() else 32,
+                                                    shuffle=False,
+                                                    num_workers=2,
+                                                    pin_memory=torch.cuda.is_available()))
 
         self.teacher.logger.save()
 
@@ -497,7 +513,10 @@ class T5Trainer:
                                                          self.test_x["attention_mask"],
                                                          self.test_x["frame_index"],
                                                          self.test_y["input_ids"]),
-                                   batch_size=32, shuffle=False),
+                                   batch_size=4 if torch.cuda.is_available() else 24,
+                                   shuffle=False,
+                                   num_workers=2,
+                                   pin_memory=False),
             ckpt_path="best",
             verbose=True
         )

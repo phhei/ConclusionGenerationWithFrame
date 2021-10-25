@@ -1,6 +1,7 @@
 import math
 import pprint
 import random
+import sys
 from pathlib import Path
 from loguru import logger
 from sklearn.metrics import accuracy_score, balanced_accuracy_score
@@ -19,14 +20,16 @@ from torch.utils.data.dataset import T_co
 from typing import Optional
 
 dataset: Path = Path("Webis-argument-framing.csv")
-include_topic: bool = True
+include_topic: bool = \
+    sys.argv[sys.argv.index("include_topic") + 1].upper() == "TRUE" if "include_topic" in sys.argv else True
 max_length: int = 128+24
 used_portion: Optional[float] = .8
 train_part: float = .8
 dev_part: float = .1
 test_part: float = .1
 
-ground_model: str = "microsoft/deberta-base-mnli"
+ground_model: str = \
+    sys.argv[sys.argv.index("ground_model") + 1].upper() if "ground_model" in sys.argv else "microsoft/deberta-base-mnli"
 # ground_model: str = "roberta-large-mnli" # "microsoft/deberta-v2-xlarge-mnli"
 label_smoothing: Optional[None] = .1
 max_epochs: int = 5
