@@ -26,6 +26,8 @@ class FrameBiasedT5ForConditionalGeneration(T5ForConditionalGeneration):
             logger.info("You're using the (1) GPU - hence we must assign all {} tensors of the frame-dict to the GPU.",
                         len(frame_dict))
             self.frame_dict = {k: tensor.cuda() for k, tensor in frame_dict.items()}
+        else:
+            self.frame_dict = frame_dict
         logger.info("Received a frame_dict, containing {} frames", len(frame_dict))
         if -1 not in frame_dict:
             logger.warning("There is no default (fallback) frame (-1) in the frame_dict included, only {}",

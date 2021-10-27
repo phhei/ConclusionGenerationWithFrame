@@ -1,7 +1,10 @@
+from functools import reduce
+
 import pandas
 from pathlib import Path
 from typing import List, Optional, Dict, Union
 from loguru import logger
+import matplotlib.pyplot as plt
 
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import normalize
@@ -12,7 +15,7 @@ from const import AVAILABLE_SCORES
 
 predictions_scores_csv: Path = Path(
     "..",
-    ".out/pytorch_lightning/FrameBiasedT5ForConditionalGeneration/128-24/smoothing0.2/tdf0.15/frame16/t5-large-res/predictions_scores.csv"
+    ".out/pytorch_lightning/T5ForConditionalGeneration/128-24/smoothing0.4/idf0.15/t5-large-res/predictions_scores.csv"
 )
 reference_scores: List[str] = ["rouge1", "rougeL", "bertscore_f1"]
 exclude_scores: List[str] = ["rouge", "bertscore_precision", "bertscore_recall", "bertscore_f1"]
@@ -37,45 +40,59 @@ def average_output(f_predictions_scores_csv: Path = predictions_scores_csv,
                        "Discard them to prevent spoiling! {} remain", len(df_main))
 
     f_ret = dict()
+    plot_dict = {
+        "xticks": [],
+        "data": [],
+        "mean": []
+    }
     try:
+        plot_dict["xticks"].extend(["best_beam_{}".format(r) for r in f_reference_scores])
+        data = [df_main["best_beam_prediction_{}".format(r)] for r in f_reference_scores]
+        mean = [data[r_i].mean(skipna=True) for r_i in range(len(data))]
         f_ret.update(
             {
-                "best_beam_avg_{}".format(r):
-                    round(df_main["best_beam_prediction_{}".format(r)].mean(skipna=True), 5)
-                for r in f_reference_scores
+                "best_beam_avg_{}".format(r): round(mean[d_i], 5)
+                for d_i, r in enumerate(f_reference_scores)
             }
         )
         f_ret.update(
             {
-                "worst_avg_{}".format(r):
-                    round(df_main[[c for c in df.columns if r in c]].min(axis="columns", skipna=True, numeric_only=True)
-                          .mean(skipna=True), 4)
-                for r in f_reference_scores
+                "best_beam_std_{}".format(r): round(data[d_i].std(skipna=True), 5)
+                for d_i, r in enumerate(f_reference_scores)
+            }
+        )
+        plot_dict["data"].extend(data)
+        plot_dict["mean"].extend(mean)
+        plot_dict["xticks"].extend(["worst_{}".format(r) for r in f_reference_scores])
+        data = [df_main[[c for c in df.columns if r in c]].min(axis="columns", skipna=True, numeric_only=True)
+                for r in f_reference_scores]
+        mean = [data[r_i].mean(skipna=True) for r_i in range(len(data))]
+        f_ret.update(
+            {
+                "worst_avg_{}".format(r): round(mean[d_i], 4)
+                for d_i, r in enumerate(f_reference_scores)
+            }
+        )
+        plot_dict["data"].extend(data)
+        plot_dict["mean"].extend(mean)
+        plot_dict["xticks"].extend(["optimal_{}".format(r) for r in f_reference_scores])
+        data = [df_main[[c for c in df.columns if r in c]].max(axis="columns", skipna=True, numeric_only=True)
+                for r in f_reference_scores]
+        mean = [data[r_i].mean(skipna=True) for r_i in range(len(data))]
+        f_ret.update(
+            {
+                "optimal_avg_{}".format(r): round(mean[d_i], 4)
+                for d_i, r in enumerate(f_reference_scores)
             }
         )
         f_ret.update(
             {
-                "optimal_avg_{}".format(r):
-                    round(df_main[[c for c in df.columns if r in c]].max(axis="columns", skipna=True, numeric_only=True)
-                          .mean(skipna=True), 4)
-                for r in f_reference_scores
+                "optimal_std_{}".format(r): round(data[d_i].std(skipna=True), 4)
+                for d_i, r in enumerate(f_reference_scores)
             }
         )
-        f_ret.update(
-            {
-                "best_beam_std_{}".format(r):
-                    round(df_main["best_beam_prediction_{}".format(r)].std(skipna=True), 5)
-                for r in f_reference_scores
-            }
-        )
-        f_ret.update(
-            {
-                "optimal_std_{}".format(r):
-                    round(df_main[[c for c in df.columns if r in c]].max(axis="columns", skipna=True, numeric_only=True)
-                          .std(skipna=True), 4)
-                for r in f_reference_scores
-            }
-        )
+        plot_dict["data"].extend(data)
+        plot_dict["mean"].extend(mean)
     except KeyError:
         logger.opt(exception=True).error("Can't calculated the average beam score. There are two possible reasons: "
                                          "1) malformed prediction_score. Are you sure you already applied the metrics "
@@ -97,6 +114,11 @@ def average_output(f_predictions_scores_csv: Path = predictions_scores_csv,
                 else:
                     df_c = df_c[training_samples + 1:]
             try:
+                plot_dict["xticks"].extend(
+                    ["selected_{}".format(r) for r in f_reference_scores if r in file.parent.name]
+                )
+                data = [df_c[r] for r in f_reference_scores if r in file.parent.name]
+                mean = [data[r_i].mean(skipna=True) for r_i in range(len(data))]
                 f_ret["{} --> {}".format(file.parent.name, file.stem)] = {
                     "selected_avg_{}".format(r): round(df_c[r].mean(skipna=True), 4)
                     for r in f_reference_scores if r in file.parent.name
@@ -105,6 +127,8 @@ def average_output(f_predictions_scores_csv: Path = predictions_scores_csv,
                     "selected_std_{}".format(r): round(df_c[r].std(skipna=True), 4)
                     for r in f_reference_scores if r in file.parent.name
                 })
+                plot_dict["data"].extend(data)
+                plot_dict["mean"].extend(mean)
                 logger.debug("Adding {} stats from \"{}\"",
                              len(f_ret["{} --> {}".format(file.parent.name, file.stem)]), file.stem)
             except KeyError:
@@ -127,6 +151,19 @@ def average_output(f_predictions_scores_csv: Path = predictions_scores_csv,
         pprint(object=f_ret, compact=True, sort_dicts=True)
 
     logger.trace("Return stats: {}", f_ret)
+
+    plt.figure(figsize=(7, 7), dpi=120)
+    plt.xticks(range(len(plot_dict["xticks"])), plot_dict["xticks"], rotation=90)
+    points = reduce(lambda a, b: a+b, [[(s_i, p) for p in series] for s_i, series in enumerate(plot_dict["data"])])
+    plt.scatter([p[0] for p in points], [p[1] for p in points],
+                s=80, alpha=0.02)
+    plt.plot(range(len(plot_dict["mean"])), plot_dict["mean"], color="b", linewidth=3, alpha=.5)
+    plt.grid(b=True, which="major", axis="y", alpha=0.25, linestyle='-', linewidth=2)
+    plt.grid(b=True, which="minor", axis="y", alpha=0.15, linestyle='--', linewidth=1)
+    plt.ylim((0, 1))
+    plt.tight_layout()
+    plt.show()
+
     return f_ret
 
 
