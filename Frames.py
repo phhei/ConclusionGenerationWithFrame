@@ -1,5 +1,6 @@
 import math
 import pathlib
+import random
 import re
 from typing import Union, Optional, List, Tuple, Dict
 
@@ -49,6 +50,30 @@ class FrameSet:
             self.name = frame_set.stem
             self.data = pandas.read_csv(filepath_or_buffer=str(frame_set.absolute()), verbose=True, index_col=0)
             logger.success("Successfully loaded {} frames{}.", len(self.data), " (+ OTHER frame)" if add_other else "")
+            frame_mapping_path = frame_set.parent.joinpath("{}.map".format(frame_set.stem))
+            if frame_mapping_path.exists():
+                try:
+                    self.predefined_mappings = {
+                        k: v["ID"] for k, v in pandas.read_csv(filepath_or_buffer=str(frame_mapping_path.absolute()),
+                                                               verbose=False, index_col=0, header=None,
+                                                               names=["String", "ID"],
+                                                               dtype={"String": "str", "ID": "int"}
+                                                               ).to_dict(orient="index").items()
+                    }
+                    logger.success("Successfully load {} string->frame-ID hints from \"{}\"",
+                                   len(self.predefined_mappings), frame_mapping_path.name)
+                except IndexError:
+                    logger.opt(exception=False).error("Your mapping file \"{}\" is malformed. Expected two values per "
+                                                      "line (\"String\", \"Frame-ID\") but got more values!",
+                                                      frame_mapping_path.name)
+                    self.predefined_mappings = dict()
+                except ValueError:
+                    logger.opt(exception=True).error("Only integer are allowed (frame-IDs) in the second column."
+                                                     "Please check your mapping-file \"{}\"", frame_mapping_path.name)
+                    self.predefined_mappings = dict()
+            else:
+                logger.info("No String-FrameID-Mapping-file defined here: {}", frame_mapping_path)
+                self.predefined_mappings = dict()
 
         self.add_other = add_other
 
@@ -99,10 +124,41 @@ class FrameSet:
                                          fetch_column: Optional[str] = "keywords_label",
                                          semantic_reordering: bool = True,
                                          remove_stopwords: bool = True) -> Union[int, str]:
-        if issue_specific_frame.upper().strip() == "OTHER":
+        if self.add_other and issue_specific_frame.upper().strip() == "OTHER":
             logger.debug("The issue_specific_frame matches exactly the \"{}\" frame - "
                          "hence, skip all the work and but it into the other-bucket :)", issue_specific_frame)
             return self.data.index.values.max() + 1 if fetch_column is None else "other"
+
+        if rank == 0 and issue_specific_frame in self.predefined_mappings:
+            idx = self.predefined_mappings[issue_specific_frame]
+            logger.debug("\"{}\" is already predefined: {}", issue_specific_frame, idx)
+            if fetch_column is None:
+                if idx >= 0:
+                    return idx
+                elif self.add_other:
+                    return self.data.index.values.max()+1
+                else:
+                    logger.error("You want to use the \"other\"-frame ({}) in {} without setting the other-bucket. "
+                                 "Select a random class...", idx, self)
+                    return random.randint(0, len(self)-1)
+            else:
+                try:
+                    if idx < 0 and self.add_other:
+                        return "other"
+                    return self.data[fetch_column][self.predefined_mappings[issue_specific_frame]]
+                except IndexError:
+                    logger.opt(exception=False).warning("Index \"{}\" is not available, but in occur in the "
+                                                        "predefined mappings ({})",
+                                                        self.predefined_mappings[issue_specific_frame],
+                                                        issue_specific_frame)
+                    if self.add_other:
+                        logger.trace("OK, let's put it into the \"other\"-bucket")
+                        return "other"
+                    else:
+                        logger.critical("No \"other\"-frame available - we don't know how to treat the entry: {}: {}",
+                                        self.predefined_mappings[issue_specific_frame],
+                                        issue_specific_frame)
+                        return "n/a"
 
         issue_specific_frame_splits = [s.lower().strip(" .\"'")
                                        for s in re.split(pattern="\s+|-|/", string=issue_specific_frame,
@@ -162,7 +218,8 @@ class FrameSet:
         o_l.sort(key=lambda k: k[1], reverse=True)
         logger.debug("Sorted the similarities: {}", o_l)
         threshold_accept = 5/8 if topic is None else 2/3
-        if o_l[0][1] == numpy.nan or (o_l[0][1] <= threshold_accept and abs(o_l[0][1]-o_l[-1][1]) <= 1/3):
+        required_gap = 1/3 * (2/3 + 1/3 * (1+math.log(len(self)/15, 10)))
+        if o_l[0][1] == numpy.nan or (o_l[0][1] <= threshold_accept and abs(o_l[0][1]-o_l[-1][1]) <= required_gap):
             logger.info("No frame fits in a good manner to \"{}\". The closest frame is {} with {}",
                         issue_specific_frame, o_l[0][0], round(o_l[0][1], 2))
             if topic is not None:
