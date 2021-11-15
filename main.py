@@ -10,13 +10,13 @@ import transformers
 from loguru import logger
 
 import Trainer
-from Evaluation.BERTscore import BertScore, BertScorePremConc
-from Evaluation.Evaluate import score_sql, CherryPicker, CherryPickerSelection, score_matrix
-from Evaluation.GRUENscore import GRUENMetric
-from Evaluation.Rougescore import RougeMetric
-from Evaluation.SurfaceScore import LengthScore, ClaimLikeScore
-from Evaluation.FrameIdentifier import FrameScore, get_frame_classifier
-from Evaluation.StanceRelationScore import StanceScore
+from Evaluation.Scores.BERTscore import BertScore, BertScorePremConc
+from Evaluation.Evaluate import score_matrix
+from Evaluation.Scores.GRUENscore import GRUENMetric
+from Evaluation.Scores.Rougescore import RougeMetric
+from Evaluation.Scores.SurfaceScore import LengthScore, ClaimLikeScore
+from Evaluation.Scores.FrameIdentifier import FrameScore, get_frame_classifier
+from Evaluation.Scores.StanceRelationScore import StanceScore
 from Frames import FrameSet
 from Transformer import FrameBiasedT5ForConditionalGeneration
 from const import FRAME_START_TOKEN, FRAME_END_TOKEN, TOPIC_START_TOKEN, TOPIC_END_TOKEN

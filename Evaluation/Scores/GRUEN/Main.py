@@ -138,7 +138,7 @@ def get_cola_score(sentences, cola_config: Optional[Any] = None, cola_tokenizer:
 
     model_name = 'bert-base-cased'
     #saved_pretrained_CoLA_model_dir = './cola_model/' + model_name + '/'
-    saved_pretrained_CoLA_model_dir = './cola_model/'
+    saved_pretrained_CoLA_model_dir = 'cola_model/'
     tokenizer, model = load_pretrained_cola_model(model_name, saved_pretrained_CoLA_model_dir)
     candidates = [y for x in sentences for y in x]
     sent_length = [len(x) for x in sentences]

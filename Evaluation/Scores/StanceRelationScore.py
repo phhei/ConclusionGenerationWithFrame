@@ -8,7 +8,7 @@ from sacrerouge.data.types import SummaryType
 from sacrerouge.metrics import Metric, ReferenceFreeMetric
 from transformers import AutoTokenizer, PreTrainedTokenizer, AutoModelForSequenceClassification, PreTrainedModel
 
-from Evaluation.Utils import clean_premise
+from Evaluation.Scores.Utils import clean_premise
 from const import TOPIC_START_TOKEN, TOPIC_END_TOKEN
 
 

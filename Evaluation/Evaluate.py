@@ -2,16 +2,15 @@ import pathlib
 import sqlite3
 from typing import List, Tuple, Optional, Callable, Union, Dict
 
-import deprecate
 import numpy
 import pandas
 from loguru import logger
 from sacrerouge.metrics import Metric, ReferenceBasedMetric, ReferenceFreeMetric
-from Evaluation.Rougescore import RougeMetric
-from Evaluation.BERTscore import BertScore, BertScorePremConc
-from Evaluation.GRUENscore import GRUENMetric
-from Evaluation.SurfaceScore import LengthScore, ClaimLikeScore
-from Evaluation.FrameIdentifier import FrameScore, get_frame_classifier
+from Evaluation.Scores.Rougescore import RougeMetric
+from Evaluation.Scores.BERTscore import BertScore, BertScorePremConc
+from Evaluation.Scores.GRUENscore import GRUENMetric
+from Evaluation.Scores.SurfaceScore import LengthScore, ClaimLikeScore
+from Evaluation.Scores.FrameIdentifier import FrameScore, get_frame_classifier
 from Frames import FrameSet
 
 

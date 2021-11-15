@@ -126,7 +126,7 @@ class FrameSet:
                                          remove_stopwords: bool = True) -> Union[int, str]:
         if self.add_other and issue_specific_frame.upper().strip() == "OTHER":
             logger.debug("The issue_specific_frame matches exactly the \"{}\" frame - "
-                         "hence, skip all the work and but it into the other-bucket :)", issue_specific_frame)
+                         "hence, skip all the work and but it into the other-bucket :)", issue_specific_frame.strip())
             return self.data.index.values.max() + 1 if fetch_column is None else "other"
 
         if rank == 0 and issue_specific_frame in self.predefined_mappings:

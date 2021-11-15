@@ -1,6 +1,6 @@
 import os
 import pathlib
-from typing import List, Tuple, Union
+from typing import List, Tuple
 
 import nltk
 import torch
@@ -10,9 +10,7 @@ from sacrerouge.data.types import SummaryType
 from sacrerouge.metrics import Metric, ReferenceFreeMetric
 from transformers import BertForMaskedLM, BertTokenizer, BertConfig, BertForSequenceClassification
 
-from Evaluation.Utils import clean_premise
-from Evaluation.GRUEN.Main import get_gruen
-from const import FRAME_END_TOKEN, TOPIC_END_TOKEN
+from Evaluation.Scores.GRUEN.Main import get_gruen
 
 
 @Metric.register(name="GRUEN", exist_ok=False)
@@ -28,7 +26,7 @@ class GRUENMetric(ReferenceFreeMetric):
         self.model_lm.eval()
         logger.trace("Load {}", self.model_lm)
 
-        saved_pretrained_cola_model_dir = pathlib.Path("Evaluation", "GRUEN", "cola_model")
+        saved_pretrained_cola_model_dir = pathlib.Path("Evaluation", "Scores", "GRUEN", "cola_model")
         self.cola_config = \
             BertConfig.from_pretrained(str(saved_pretrained_cola_model_dir.absolute()), num_labels=2,
                                        finetuning_task='CoLA')

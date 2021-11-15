@@ -1,4 +1,3 @@
-import abc
 from math import exp
 from typing import List, Optional, Union, Tuple
 
@@ -12,7 +11,7 @@ from sacrerouge.metrics import Metric, ReferenceFreeMetric
 
 
 # related to https://aclanthology.org/E17-1017.pdf ON SURFACE
-from Evaluation.Utils import clean_premise
+from Evaluation.Scores.Utils import clean_premise
 
 
 class SurfaceHint(ReferenceFreeMetric):

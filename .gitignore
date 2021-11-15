@@ -2,11 +2,11 @@
 /logs/
 /frame_sets/frame_datasets/
 /frame_classifier/
-/Evaluation/GRUEN/cola_model/
-/Evaluation/GRUEN/.gitignore
-/Evaluation/GRUEN/LICENSE
-/Evaluation/GRUEN/linguistic_aspects.png
-/Evaluation/GRUEN/README.md
+/Evaluation/Scores/GRUEN/cola_model/
+/Evaluation/Scores/GRUEN/.gitignore
+/Evaluation/Scores/GRUEN/LICENSE
+/Evaluation/Scores/GRUEN/linguistic_aspects.png
+/Evaluation/Scores/GRUEN/README.md
 /.pytest_cache/
 /.out/
 /venv/

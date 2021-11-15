@@ -1,0 +1,118 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+        "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+    <title>Amazon Turk survey</title>
+    <script src = "https://assets.crowd.aws/crowd-html-elements.js"></script>
+        <script>
+            function Validity(l, id) {
+                if (l) {
+                    document.getElementById('left' + id).style.backgroundColor = "#90EE90";
+                    document.getElementById('right' + id).style.backgroundColor = "white";
+                } else {
+                    document.getElementById('right' + id).style.backgroundColor = "#90EE90";
+                    document.getElementById('left' + id).style.backgroundColor = "white";
+                }
+            }
+
+            function  Novelty(l, id) {
+                if (l) {
+                    document.getElementById('left' + id).style.fontWeight = "bold";
+                    document.getElementById('right' + id).style.fontWeight = "normal";
+                } else {
+                    document.getElementById('right' + id).style.fontWeight = "bold";
+                    document.getElementById('left' + id).style.fontWeight = "normal";
+                }
+            }
+
+            function  FrameSpec(l, id) {
+                if (l) {
+                    document.getElementById('left' + id).setAttribute('heading', unescape('%BB%BB Conclusion 1 %AB%AB'));
+                    document.getElementById('right' + id).setAttribute('heading', 'Conclusion 2');
+                } else {
+                    document.getElementById('right' + id).setAttribute('heading', unescape('%BB%BB Conclusion 2 %AB%AB'));
+                    document.getElementById('left' + id).setAttribute('heading', 'Conclusion 1');
+                }
+            }
+
+            function  FrameGen(l, id) {
+                if (l) {
+                    document.getElementById('left' + id).setAttribute('heading', unescape('%BB Conclusion 1 %AB'));
+                    document.getElementById('right' + id).setAttribute('heading', 'Conclusion 2');
+                } else {
+                    document.getElementById('right' + id).setAttribute('heading', unescape('%BB Conclusion 2 %AB'));
+                    document.getElementById('left' + id).setAttribute('heading', 'Conclusion 1');
+                }
+            }
+        </script>
+</head>
+<body>
+    <crowd-form>
+    <crowd-instructions link-text="View instructions" link-type="button">
+        <short-summary>
+          We ask you to rate conclusions in a pair-wise manner.
+        </short-summary>
+        <detailed-instructions>
+            <p>We ask you to rate conclusions in a pair-wise manner in a discussion. To this end, you have for each argument the topic in the title, a premise (the explain- / give-reasons-part of an argument) and two conclusions (two stated claims) (hopefully) matching the premise. But - which conclusion is more appropriate? Which conclusion fits the premise better?</p>
+
+            <p>Premise --&gt; conclusion 1 ? OR Premise --&gt; conclusion 2?</p>
+
+            <h4>To have differentiated voting, you have to decide on 3+1 aspects.</h4>
+
+            <ol>
+                <li><b>Validity:</b> Which conclusion is more reasonable / more appropriate? So, what is more likely? Conclusion 1 follows given the premise or conclusion 2?</li>
+                <li><b>Novelty:</b> Which conclusion contains more novel information? Copying (or rephrasing) parts of the premise is too easy (should get no vote rather). Here we seek the conclusion with the most novel content, with the most conclusion-information-gain.</li>
+                <li><b>Perspective &raquo;xxx&laquo;:</b> You can argue from different perspectives. For example, if you discuss raising taxes, you can emphasize the side of the tax-payers or the government's side or think about moral viewpoints. All these perspectives are called &raquo;Frames&laquo;. Here, you should rate how much the desired perspective occurs in the conclusions. A conclusion that fits more (obviously) into the desired perspective should gain the vote.</li>
+            </ol>
+
+            <h4>How to vote?</h4>
+            <p>If you want to vote for conclusion 1 for a certain aspect, please select the left radio box (because you vote for the left conclusion which is better in the certain aspect). If you rate conclusion 2 as the better one for a certain aspect, select the radio box on the right side for the certain aspect.</p>
+        </detailed-instructions>
+        <positive-example>
+          <img src="https://www.philippheinisch.de/img/AZ/good_example_n.jpg" width="100%">
+          <ul>
+            <li>differentiated voting: although conclusion 2 is the more trivial one (somewhat a rephrased interpretation of the premise), conclusion 1 is more novel and exactly talks about animal rights, hence it receives 2/4 votes</li>
+            <li>you read each text carefully, thinking about it and hence, you noticed conclusion 2 is a little bit clearer about fairness and equality since the farmers are not fairly treated - suites the aspect  &raquo;fairness and equality&laquo;</li>
+          </ul>
+        </positive-example>
+        <negative-example>
+          <img src="http://www.philippheinisch.de/img/AZ/bad_example_n.jpg" width="100%">
+          <ul>
+            <li>lazy voting (here only for conclusion 1) - yes, sometimes one conclusion outperforms the other in <b>all</b> categories, but this is rare</li>
+            <li>maybe you're thinking: "meat isn't cheap at my supermarket" and therefore, you voted for conclusion 1 - however, we don't ask for your personal opinion about the topic, only stick to the premise and the conclusion - and the premise STATES the low prices at meat and so on.</li>
+          </ul>
+        </negative-example>
+    </crowd-instructions>
+
+    <p>We ask you to rate conclusions in a pair-wise manner in a discussion. To this end, you have for each argument the topic in the title, a premise (the explain- / give-reasons-part of an argument) and two conclusions (two stated claims) (hopefully) matching the premise. But - which conclusion is more appropriate? Which conclusion fits the premise better?</p>
+    <p>Premise --&gt; conclusion 1 ? OR Premise --&gt; conclusion 2?</p>
+    <h4>To have differentiated voting, you have to decide on 3(+1) aspects.</h4>
+
+    <ol>
+        <li><b>Validity:</b> Which conclusion is more reasonable / more appropriate? So, what is more likely? Conclusion 1 follows given the premise or conclusion 2?</li>
+        <li><b>Novelty:</b> Which conclusion contains more novel information? Copying (or rephrasing) parts of the premise is too easy (should get no vote rather). Here we seek the conclusion with the most novel content, with the most conclusion-information-gain.</li>
+        <li><b>Perspective &raquo;xxx&laquo;:</b> You can argue from different perspectives. For example, if you discuss raising taxes, you can emphasize the side of the tax-payers or the government's side or think about moral viewpoints. All these perspectives are called &raquo;Frames&laquo;. Here, you should rate how much the desired perspective occurs in the conclusions. A conclusion that fits more (obviously) into the desired perspective should gain the vote.</li>
+    </ol>
+
+    <h4>How to vote?</h4>
+    <p>If you want to vote for conclusion 1 for a certain aspect, please select the left radio box (because you vote for the left conclusion which is better in the certain aspect). If you rate conclusion 2 as the better one for a certain aspect, select the radio box on the right side for the certain aspect.</p>
+
+
+    <style>
+        crowd-card {
+            width: 100%;
+        }
+        .side {
+            width: 35%;
+            vertical-align: top;
+            margin: auto;
+            display: inline-block;
+        }
+        .middle {
+            min-width: 15%;
+            vertical-align: top;
+            text-align: center;
+            margin: auto;
+            display: inline-block;
+        }
+    </style>
