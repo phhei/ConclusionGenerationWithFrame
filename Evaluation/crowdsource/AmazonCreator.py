@@ -107,12 +107,12 @@ if __name__ == "__main__":
                           </fieldset>
                           <fieldset id="{0}_Novelty_{5}">
                             <input type="radio" value="conclusion1" name="{0}_Novelty_{5}" required onclick="Novelty(true, '{0}_{4}');">
-                            <label for="{0}_Wording_{5}"><span style="text-decoration-style: dotted;" title="More novel stuff &lt;-- Concl. 1 OR Concl. 2 --&gt;">Novelty</span></label>
+                            <label for="{0}_Novelty_{5}"><span style="text-decoration-style: dotted;" title="More novel stuff &lt;-- Concl. 1 OR Concl. 2 --&gt;">Novelty</span></label>
                             <input type="radio" value="conclusion2" name="{0}_Novelty_{5}" onclick="Novelty(false, '{0}_{4}');">
                           </fieldset>
                           <fieldset id="{0}_FrameSpec_{5}">
                             <input type="radio" value="conclusion1" name="{0}_FrameSpec_{5}" required onclick="FrameSpec(true, '{0}_{4}');">
-                            <label for="{0}_Informativeness_{5}"><span style="text-decoration-style: dotted;" title="More {7}? &lt;-- Concl. 1 OR Concl. 2 --&gt;">Perspective &raquo;{7}&laquo;</span></label>
+                            <label for="{0}_FrameSpec_{5}"><span style="text-decoration-style: dotted;" title="More {7}? &lt;-- Concl. 1 OR Concl. 2 --&gt;">Perspective &raquo;{7}&laquo;</span></label>
                             <input type="radio" value="conclusion2" name="{0}_FrameSpec_{5}" onclick="FrameSpec(false, '{0}_{4}');">
                           </fieldset>
                     """.format(index, optimize_input(df[column_for_premise][index]), df[combo[0]][index],
@@ -122,10 +122,10 @@ if __name__ == "__main__":
                     if (df["_specific_frame"][index] != df["_generic_frame"][index]) and \
                             (not skip_generic_frame_question_when_other or df["_generic_frame"][index] != "other"):
                         content += """
-                              <fieldset id="{0}_FrmaeGen_{5}">
-                                <input type="radio" value="conclusion1" name="{0}_Specificity_{5}" required onclick="FrameGen(true, '{0}_{4}');">
-                                <label for="{0}_Specificity_{5}"><span style="text-decoration-style: dotted;" title="More {8}? &lt;-- Concl. 1 OR Concl. 2 --&gt;">Perspective &raquo;{8}&laquo;</span></label>
-                                <input type="radio" value="conclusion2" name="{0}_Specificity_{5}" onclick="FrameGen(false, '{0}_{4}');">
+                              <fieldset id="{0}_FrameGen_{5}">
+                                <input type="radio" value="conclusion1" name="{0}_FrameGen_{5}" required onclick="FrameGen(true, '{0}_{4}');">
+                                <label for="{0}_FrameGen_{5}"><span style="text-decoration-style: dotted;" title="More {8}? &lt;-- Concl. 1 OR Concl. 2 --&gt;">Perspective &raquo;{8}&laquo;</span></label>
+                                <input type="radio" value="conclusion2" name="{0}_FrameGen_{5}" onclick="FrameGen(false, '{0}_{4}');">
                               </fieldset>
                         """.format(index, optimize_input(df[column_for_premise][index]), df[combo[0]][index],
                                df[combo[1]][index], i, "__".join(combo),
