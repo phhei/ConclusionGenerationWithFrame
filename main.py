@@ -459,10 +459,12 @@ if __name__ == '__main__':
     columns = generated_data.pop("columns")
     logger.success("Generated {} samples ({})", len(generated_data), "|".join(columns))
 
-    alternating_frame_index = [(0, "")]
+    alternating_frame_collection = [""]
     if alternating_frame_set is not None:
-        alternating_frame_index.extend([(f_id, name) for f_id, name in alternating_frame_set.data.iterrows()])
-    for alternating_frame_index, alternating_frame_name in alternating_frame_index:
+        alternating_frame_collection.extend(
+            [name["label"] for _, name in alternating_frame_set.data.iterrows()]
+        )
+    for alternating_frame_index, alternating_frame_name in enumerate(alternating_frame_collection):
         logger.info("Let's collect and analyse the data for frame {}",
                     "ORIGINAL" if alternating_frame_name == "" else alternating_frame_name)
         current_dict = {k[:-(len(str(alternating_frame_index))+1)]: v
@@ -470,8 +472,11 @@ if __name__ == '__main__':
         df = pandas.DataFrame.from_dict(
             data=current_dict,
             orient="index", columns=columns)
-        file_ending = "{}{}".format("_{}".format(samples_to_be_generate) if samples_to_be_generate >= 1 else "",
-                                    "_{}".format(alternating_frame_name) if len(alternating_frame_name) >= 1 else "")
+        file_ending = "{}{}".format(
+            "_{}".format(samples_to_be_generate) if samples_to_be_generate >= 1 else "",
+            "_{}".format(alternating_frame_name.replace(",", "").replace(" ", "-"))
+            if len(alternating_frame_name) >= 1 else ""
+        )
         logger.debug("{} -> {} ({})", len(generated_data), len(current_dict), file_ending)
 
         if root_save_path is not None:
