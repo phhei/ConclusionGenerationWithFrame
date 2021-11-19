@@ -524,7 +524,7 @@ class T5Trainer:
         logger.success("Test finished: {}", props_test)
 
     def generate(self, limit=-1, min_length=2, max_length=24, cherry_picker: Optional[CherryPicker] = None,
-                 comprehensive_result: bool = True) -> Dict:
+                 comprehensive_result: bool = True, alternating_index: int = 1) -> Dict:
         ret = dict()
 
         if limit >= 1 and limit > len(self.test_x["input_ids"]):
@@ -569,7 +569,9 @@ class T5Trainer:
                                                        skip_special_tokens=True,
                                                        clean_up_tokenization_spaces=True)
 
-            ret["test_{}".format(i)] = {
+            key = "test_{}_{}".format(int(i/alternating_index), i % alternating_index)
+
+            ret[key] = {
                 "input_without_special_tokens": plain_input_premise,
                 "input_debug": plain_input_premise_debug,
                 "input": plain_input_premise_debug
@@ -644,10 +646,10 @@ class T5Trainer:
             if outputs_low_temp is not None:
                 output_ids = outputs_low_temp.sequences[0]
 
-                ret["test_{}".format(i)]["best_beam_prediction"] = \
+                ret[key]["best_beam_prediction"] = \
                     self.tokenizer.decode(token_ids=output_ids, skip_special_tokens=True,
                                           clean_up_tokenization_spaces=True)
-                ret["test_{}".format(i)]["best_beam_prediction_debug"] = \
+                ret[key]["best_beam_prediction_debug"] = \
                     self.tokenizer.decode(token_ids=output_ids, skip_special_tokens=False,
                                           clean_up_tokenization_spaces=False)
             if outputs_high_temp is not None:
@@ -668,10 +670,10 @@ class T5Trainer:
                                               clean_up_tokenization_spaces=False)
                     )
                     if comprehensive_result:
-                        ret["test_{}".format(i)]["prediction_{}".format(seq_id)] = \
+                        ret[key]["prediction_{}".format(seq_id)] = \
                             self.tokenizer.decode(token_ids=seq, skip_special_tokens=True,
                                                   clean_up_tokenization_spaces=True)
-                        ret["test_{}".format(i)]["prediction_debug_{}".format(seq_id)] = plain_predictions_debug[-1]
+                        ret[key]["prediction_debug_{}".format(seq_id)] = plain_predictions_debug[-1]
                 if cherry_picker is not None:
                     logger.trace("Collected {} predictions: {}", len(plain_premise_predictions),
                                  " +++ ".join(map(lambda p: p[-1], plain_premise_predictions)))
@@ -679,15 +681,14 @@ class T5Trainer:
                         cherry_picker.cherry_picking(generated_sequences=plain_premise_predictions,
                                                      reference=plain_ground_truth)
                     selected_prediction_debug = plain_predictions_debug[pos]
-                    ret["test_{}".format(i)]["selected_prediction"] = selected_prediction
-                    ret["test_{}".format(i)]["selected_prediction_debug"] = selected_prediction_debug
-                    ret["test_{}".format(i)]["selected_prediction_pos"] = pos
+                    ret[key]["selected_prediction"] = selected_prediction
+                    ret[key]["selected_prediction_debug"] = selected_prediction_debug
+                    ret[key]["selected_prediction_pos"] = pos
 
-            final_prediction_debug = ret["test_{}".format(i)].get("selected_prediction_debug",
-                                                                  ret["test_{}".format(i)].get("best_beam_prediction_debug",
-                                                                                               "n/a"))
-            final_prediction = ret["test_{}".format(i)].get("selected_prediction",
-                                                            ret["test_{}".format(i)].get("best_beam_prediction", "n/a"))
+            final_prediction_debug = ret[key].get("selected_prediction_debug",
+                                                  ret[key].get("best_beam_prediction_debug", "n/a"))
+            final_prediction = ret[key].get("selected_prediction",
+                                            ret[key].get("best_beam_prediction", "n/a"))
             logger.debug("Predicting \"{}\" --> \"{}\"", final_prediction_debug, final_prediction)
             if final_prediction == plain_ground_truth:
                 logger.success("We predict the ground truth \"{}\" -> \"{}\"", plain_input_premise,

@@ -67,3 +67,6 @@ datasets >= 1.8.0
 
 # C:\Users\Philipp\Documents\Einsortiertes\Nach Lebensabschnitten einsortiert\Promotionszeit (2019-2023)\Promotion\Programming\Phython\Apps\ArgConclusionGenFrameScheme\FrameClassifier.py
 scikit-learn == 1.0
+
+typing~=3.7.4.3
+matplotlib~=3.4.3

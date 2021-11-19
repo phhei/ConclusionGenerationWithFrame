@@ -124,130 +124,137 @@ class FrameSet:
                                          fetch_column: Optional[str] = "keywords_label",
                                          semantic_reordering: bool = True,
                                          remove_stopwords: bool = True) -> Union[int, str]:
-        if self.add_other and issue_specific_frame.upper().strip() == "OTHER":
-            logger.debug("The issue_specific_frame matches exactly the \"{}\" frame - "
-                         "hence, skip all the work and but it into the other-bucket :)", issue_specific_frame.strip())
-            return self.data.index.values.max() + 1 if fetch_column is None else "other"
-
-        if rank == 0 and issue_specific_frame in self.predefined_mappings:
-            idx = self.predefined_mappings[issue_specific_frame]
-            logger.debug("\"{}\" is already predefined: {}", issue_specific_frame, idx)
-            if fetch_column is None:
-                if idx >= 0:
-                    return idx
-                elif self.add_other:
-                    return self.data.index.values.max()+1
-                else:
-                    logger.error("You want to use the \"other\"-frame ({}) in {} without setting the other-bucket. "
-                                 "Select a random class...", idx, self)
-                    return random.randint(0, len(self)-1)
-            else:
-                try:
-                    if idx < 0 and self.add_other:
-                        return "other"
-                    return self.data[fetch_column][self.predefined_mappings[issue_specific_frame]]
-                except IndexError:
-                    logger.opt(exception=False).warning("Index \"{}\" is not available, but in occur in the "
-                                                        "predefined mappings ({})",
-                                                        self.predefined_mappings[issue_specific_frame],
-                                                        issue_specific_frame)
-                    if self.add_other:
-                        logger.trace("OK, let's put it into the \"other\"-bucket")
-                        return "other"
-                    else:
-                        logger.critical("No \"other\"-frame available - we don't know how to treat the entry: {}: {}",
-                                        self.predefined_mappings[issue_specific_frame],
-                                        issue_specific_frame)
-                        return "n/a"
-
-        issue_specific_frame_splits = [s.lower().strip(" .\"'")
-                                       for s in re.split(pattern="\s+|-|/", string=issue_specific_frame,
-                                                         maxsplit=15 if topic is None else 6)
-                                       if len(s) >= 1]
-        logger.debug("Retrieved a issue-specific-frame: \"{}\" -> {}", issue_specific_frame,
-                     issue_specific_frame_splits)
-
-        if semantic_reordering and len(issue_specific_frame_splits) >= 2:
-            def semantic_reorder(tokens:List[str]) -> List[str]:
-                tokens_pos = nltk.pos_tag(tokens=tokens, tagset="universal")
-                noun_tokens = [tok for tok, pos in tokens_pos if pos == "NOUN"]
-                noun_tokens.reverse()
-                non_noun_tokens = [tok for tok, pos in tokens_pos if pos != "NOUN"]
-                return noun_tokens + non_noun_tokens
-            try:
-                issue_specific_frame_splits = semantic_reorder(issue_specific_frame_splits)
-                logger.trace("Reordered the frame splits: {}", " > ".join(issue_specific_frame_splits))
-            except LookupError:
-                logger.warning("There is a nltk-module missing - we execute "
-                               "\"nltk.download('averaged_perceptron_tagger')\" first!")
-                if nltk.download("averaged_perceptron_tagger") and nltk.download("universal_tagset"):
-                    issue_specific_frame_splits = semantic_reorder(issue_specific_frame_splits)
-                    logger.success("Success - reordered the frame splits: {}", " > ".join(issue_specific_frame_splits))
-                else:
-                    logger.critical("We're not able to install the necessary nltk-module. Hence, we must disable the "
-                                    "semantic reordering")
-                    semantic_reordering = False
-
-        if remove_stopwords:
-            logger.trace("Let's remove the stopwords from the {} tokens", len(issue_specific_frame_splits))
-            issue_specific_frame_splits = [s for s in issue_specific_frame_splits if s not in stop_words]
-
-        logger.debug("Final words to weight: {}", "-".join(issue_specific_frame_splits))
-        if len(issue_specific_frame_splits) == 0:
-            logger.warning("The frame \"{}\" results in an empty one after preprocessing - let's sort into \"other\"")
-            issue_specific_frame_splits = ["other"]
-
-        issue_specific_frame_vecs =\
-            [self.w2v.get(s, numpy.zeros_like(self.w2v["the"])) for s in issue_specific_frame_splits]
-        logger.trace("Collected {} numpy-word-embeddings", len(issue_specific_frame_vecs))
-
-        if semantic_reordering:
-            issue_specific_frame_vecs = [math.exp(-i)*v for i, v in enumerate(issue_specific_frame_vecs)]
-
-        issue_specific_frame_vec =\
-            numpy.average(issue_specific_frame_vecs, axis=0,
-                          weights=numpy.exp2(numpy.flip(numpy.arange(start=1,
-                                                                     stop=len(issue_specific_frame_vecs)+1),
-                                                        axis=0)) if semantic_reordering else None)
-        logger.trace("issue_specific_frame_vec: {}", issue_specific_frame_vec)
-
-        def cos_sim(a: numpy.ndarray, b: numpy.ndarray):
-            return numpy.dot(a, b) / (numpy.linalg.norm(a) * numpy.linalg.norm(b))
-
-        o_l = [(i, cos_sim(issue_specific_frame_vec, self.data["w2v_keywords_label"][i])) for i in self.data.index]
-        o_l.sort(key=lambda k: k[1], reverse=True)
-        logger.debug("Sorted the similarities: {}", o_l)
-        threshold_accept = 5/8 if topic is None else 2/3
-        required_gap = 1/3 * (2/3 + 1/3 * (1+math.log(len(self)/15, 10)))
-        if o_l[0][1] == numpy.nan or (o_l[0][1] <= threshold_accept and abs(o_l[0][1]-o_l[-1][1]) <= required_gap):
-            logger.info("No frame fits in a good manner to \"{}\". The closest frame is {} with {}",
-                        issue_specific_frame, o_l[0][0], round(o_l[0][1], 2))
-            if topic is not None:
-                logger.info("You insert also the topic \"{}\" - maybe this will help to define \"{}\" "
-                            "in a better way.", topic, issue_specific_frame)
-                return self.issues_specific_frame_to_generic(
-                    issue_specific_frame="{} -> {}".format(topic, issue_specific_frame),
-                    topic=None, rank=rank, fetch_column=fetch_column,
-                    semantic_reordering=True, remove_stopwords=remove_stopwords
-                )
-
-            if self.add_other and rank == 0:
-                logger.trace("OK, let's put it into the \"other\"-bucket")
-                return self.data.index.values.max()+1 if fetch_column is None else "other"
-
         try:
-            if fetch_column is None:
-                return o_l[rank][0]
-            elif fetch_column in self.data.columns:
-                return self.data[fetch_column][o_l[rank][0]]
-            else:
-                logger.warning("The dataframe doesn't contain the desired column \"{}\" - only {}", fetch_column,
-                               self.data.columns)
-                return self.data["keywords_label"][o_l[rank][0]]
-        except IndexError:
-            logger.opt(exception=False).error("You want to retrieve the rank \"{}\", but you have only {} frames in {}",
-                                              rank, len(self.data), self.name)
-            return "other" if self.add_other else "n/a"
+            if self.add_other and issue_specific_frame.upper().strip() == "OTHER":
+                logger.debug("The issue_specific_frame matches exactly the \"{}\" frame - "
+                             "hence, skip all the work and but it into the other-bucket :)", issue_specific_frame.strip())
+                return self.data.index.values.max() + 1 if fetch_column is None else "other"
+
+            if rank == 0 and issue_specific_frame in self.predefined_mappings:
+                idx = self.predefined_mappings[issue_specific_frame]
+                logger.debug("\"{}\" is already predefined: {}", issue_specific_frame, idx)
+                if fetch_column is None:
+                    if idx >= 0:
+                        return idx
+                    elif self.add_other:
+                        return self.data.index.values.max()+1
+                    else:
+                        logger.error("You want to use the \"other\"-frame ({}) in {} without setting the other-bucket. "
+                                     "Select a random class...", idx, self)
+                        return random.randint(0, len(self)-1)
+                else:
+                    try:
+                        if idx < 0 and self.add_other:
+                            return "other"
+                        return self.data[fetch_column][self.predefined_mappings[issue_specific_frame]]
+                    except IndexError:
+                        logger.opt(exception=False).warning("Index \"{}\" is not available, but in occur in the "
+                                                            "predefined mappings ({})",
+                                                            self.predefined_mappings[issue_specific_frame],
+                                                            issue_specific_frame)
+                        if self.add_other:
+                            logger.trace("OK, let's put it into the \"other\"-bucket")
+                            return "other"
+                        else:
+                            logger.critical("No \"other\"-frame available - we don't know how to treat the entry: {}: {}",
+                                            self.predefined_mappings[issue_specific_frame],
+                                            issue_specific_frame)
+                            return "n/a"
+
+            issue_specific_frame_splits = [s.lower().strip(" .\"'")
+                                           for s in re.split(pattern="\s+|-|/", string=issue_specific_frame,
+                                                             maxsplit=15 if topic is None else 6)
+                                           if len(s) >= 1]
+            logger.debug("Retrieved a issue-specific-frame: \"{}\" -> {}", issue_specific_frame,
+                         issue_specific_frame_splits)
+
+            if semantic_reordering and len(issue_specific_frame_splits) >= 2:
+                def semantic_reorder(tokens:List[str]) -> List[str]:
+                    tokens_pos = nltk.pos_tag(tokens=tokens, tagset="universal")
+                    noun_tokens = [tok for tok, pos in tokens_pos if pos == "NOUN"]
+                    noun_tokens.reverse()
+                    non_noun_tokens = [tok for tok, pos in tokens_pos if pos != "NOUN"]
+                    return noun_tokens + non_noun_tokens
+                try:
+                    issue_specific_frame_splits = semantic_reorder(issue_specific_frame_splits)
+                    logger.trace("Reordered the frame splits: {}", " > ".join(issue_specific_frame_splits))
+                except LookupError:
+                    logger.warning("There is a nltk-module missing - we execute "
+                                   "\"nltk.download('averaged_perceptron_tagger')\" first!")
+                    if nltk.download("averaged_perceptron_tagger") and nltk.download("universal_tagset"):
+                        issue_specific_frame_splits = semantic_reorder(issue_specific_frame_splits)
+                        logger.success("Success - reordered the frame splits: {}", " > ".join(issue_specific_frame_splits))
+                    else:
+                        logger.critical("We're not able to install the necessary nltk-module. Hence, we must disable the "
+                                        "semantic reordering")
+                        semantic_reordering = False
+
+            if remove_stopwords:
+                logger.trace("Let's remove the stopwords from the {} tokens", len(issue_specific_frame_splits))
+                issue_specific_frame_splits = [s for s in issue_specific_frame_splits if s not in stop_words]
+
+            logger.debug("Final words to weight: {}", "-".join(issue_specific_frame_splits))
+            if len(issue_specific_frame_splits) == 0:
+                logger.warning("The frame \"{}\" results in an empty one after preprocessing - let's sort into \"other\"")
+                issue_specific_frame_splits = ["other"]
+
+            issue_specific_frame_vecs =\
+                [self.w2v.get(s, numpy.zeros_like(self.w2v["the"])) for s in issue_specific_frame_splits]
+            logger.trace("Collected {} numpy-word-embeddings", len(issue_specific_frame_vecs))
+
+            if semantic_reordering:
+                issue_specific_frame_vecs = [math.exp(-i)*v for i, v in enumerate(issue_specific_frame_vecs)]
+
+            issue_specific_frame_vec =\
+                numpy.average(issue_specific_frame_vecs, axis=0,
+                              weights=numpy.exp2(numpy.flip(numpy.arange(start=1,
+                                                                         stop=len(issue_specific_frame_vecs)+1),
+                                                            axis=0)) if semantic_reordering else None)
+            logger.trace("issue_specific_frame_vec: {}", issue_specific_frame_vec)
+
+            def cos_sim(a: numpy.ndarray, b: numpy.ndarray):
+                return numpy.dot(a, b) / (numpy.linalg.norm(a) * numpy.linalg.norm(b))
+
+            o_l = [(i, cos_sim(issue_specific_frame_vec, self.data["w2v_keywords_label"][i])) for i in self.data.index]
+            o_l.sort(key=lambda k: k[1], reverse=True)
+            logger.debug("Sorted the similarities: {}", o_l)
+            threshold_accept = 5/8 if topic is None else 2/3
+            required_gap = 1/3 * (2/3 + 1/3 * (1+math.log(len(self)/15, 10)))
+            if o_l[0][1] == numpy.nan or (o_l[0][1] <= threshold_accept and abs(o_l[0][1]-o_l[-1][1]) <= required_gap):
+                logger.info("No frame fits in a good manner to \"{}\". The closest frame is {} with {}",
+                            issue_specific_frame, o_l[0][0], round(o_l[0][1], 2))
+                if topic is not None:
+                    logger.info("You insert also the topic \"{}\" - maybe this will help to define \"{}\" "
+                                "in a better way.", topic, issue_specific_frame)
+                    return self.issues_specific_frame_to_generic(
+                        issue_specific_frame="{} -> {}".format(topic, issue_specific_frame),
+                        topic=None, rank=rank, fetch_column=fetch_column,
+                        semantic_reordering=True, remove_stopwords=remove_stopwords
+                    )
+
+                if self.add_other and rank == 0:
+                    logger.trace("OK, let's put it into the \"other\"-bucket")
+                    return self.data.index.values.max()+1 if fetch_column is None else "other"
+
+            try:
+                if fetch_column is None:
+                    return o_l[rank][0]
+                elif fetch_column in self.data.columns:
+                    return self.data[fetch_column][o_l[rank][0]]
+                else:
+                    logger.warning("The dataframe doesn't contain the desired column \"{}\" - only {}", fetch_column,
+                                   self.data.columns)
+                    return self.data["keywords_label"][o_l[rank][0]]
+            except IndexError:
+                logger.opt(exception=False).error("You want to retrieve the rank \"{}\", "
+                                                  "but you have only {} frames in {}",
+                                                  rank, len(self.data), self.name)
+                return "other" if self.add_other else "n/a"
+        except AttributeError:
+            logger.opt(exception=True).error("Received a wrong (typed) parameter. "
+                                             "issue_specific_frame must be a string but is \"{}\" ({}). "
+                                             "Same holds for topic (but is optional)", issue_specific_frame,
+                                             type(issue_specific_frame))
 
     def get_frame_count_dict(self, corpora: List[List[Tuple[Union[int, str], torch.Tensor]]], vocab_size: int)\
             -> Dict[int, torch.Tensor]:

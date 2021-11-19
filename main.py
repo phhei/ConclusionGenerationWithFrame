@@ -69,7 +69,10 @@ preferred_model_for_stance_identifier: Optional[str] = \
         if include_topic else \
         Path("stance_classifier", "microsoft", "deberta-base-mnli", "without topic", "152")
 preferred_tokenizer_for_stance_identifier: Optional[str] = "microsoft/deberta-base-mnli"
-samples_to_be_generate: int = -1
+samples_to_be_generate: int = \
+    int(sys.argv[sys.argv.index("samples_generate") + 1]) if "samples_generate" in sys.argv else -1
+create_for_all_generic_frames: Optional[str] = \
+    sys.argv[sys.argv.index("generic_frames_generator") + 1] if "generic_frames_generator" in sys.argv else None
 
 # OTHER PARAMS
 log_level_console: str = "INFO"
@@ -250,10 +253,42 @@ if __name__ == '__main__':
                     ", ".join(["{}: {}".format(c[1], (train_x["frame_index"] == c[0]).count_nonzero().item())
                                for c in cluster_frame.data.itertuples(index=True, name=None)]))
 
-    val_x, val_y = convert_input_str_to_input_int(convert_samples_to_input_str(val),
+    val_x, val_y = convert_input_str_to_input_int(split=convert_samples_to_input_str(val),
                                                   fn_tokenizer=tokenizer,
                                                   max_length=(max_length_premise, max_length_conclusion))
-    test_x, test_y = convert_input_str_to_input_int(convert_samples_to_input_str(test),
+    alternating_frame_set: Optional[FrameSet] = None
+    if create_for_all_generic_frames is not None:
+        logger.info("You want to create a frame-generation matrix on the base of \"{}\" - fine, let's load it!",
+                    create_for_all_generic_frames)
+        alternating_frame_set = FrameSet(frame_set=create_for_all_generic_frames, add_other=False)
+        logger.warning("Using \"{}\" as base will increase your test size (and hence, the generation run-time) "
+                       "by {} times!", alternating_frame_set, len(alternating_frame_set))
+        test_extend = pandas.DataFrame(columns=test.columns)
+        for row_id, data in test.iterrows():
+            logger.trace("Duplicating row \"{}\" now...", row_id)
+            try:
+                def apply_frame(series: pandas.Series, frame_id, frame) -> pandas.Series:
+                    s = series.copy(deep=True)
+                    s["frame_id"] = frame_id
+                    s["frame"] = frame
+                    return s
+
+                test_extend = test_extend.append(
+                    pandas.DataFrame(data=[data], columns=test.columns, index=[row_id]),
+                    ignore_index=False, verify_integrity=True
+                ).append(
+                    pandas.DataFrame(
+                        data=[apply_frame(series=data, frame_id=frame_id, frame=frame["label"])
+                              for frame_id, frame in alternating_frame_set.data.iterrows()],
+                        index=["{}_{}".format(row_id, i) for i in range(len(alternating_frame_set))],
+                        columns=test.columns),
+                    ignore_index=False, verify_integrity=True
+                )
+            except ValueError:
+                logger.opt(exception=True).error("Something bad happened - ignore row \"{}\"", row_id)
+        logger.success("Successfully enriched the test set: {} --> {} rows", len(test), len(test_extend))
+        test = test_extend
+    test_x, test_y = convert_input_str_to_input_int(split=convert_samples_to_input_str(test),
                                                     fn_tokenizer=tokenizer,
                                                     max_length=(max_length_premise, max_length_conclusion))
 
@@ -262,7 +297,7 @@ if __name__ == '__main__':
         if cluster_frame is None:
             model = transformers.T5ForConditionalGeneration.from_pretrained(model)
             logger.error("You don't define implicitly a transformer model, hence we assume you want to have a frame-"
-                         "tailored model. However, you donÄt define a frame set! Fall back to: {}", type(model))
+                         "tailored model. However, you don't define a frame set! Fall back to: {}", type(model))
         else:
             logger.warning("We don't have a proper model until yet, only a string \"{}\". "
                            "We assume that the frame-related FrameBiasedT5ForConditionalGeneration is needed.", model)
@@ -417,34 +452,69 @@ if __name__ == '__main__':
     logger.trace("######################################### Start  inference #########################################")
     logger.trace("####################################################################################################")
 
-    generated_data = trainer.generate(limit=samples_to_be_generate, cherry_picker=None, comprehensive_result=True)
+    generated_data = trainer.generate(
+        limit=samples_to_be_generate, cherry_picker=None, comprehensive_result=True,
+        alternating_index=1 if alternating_frame_set is None else 1+len(alternating_frame_set)
+    )
     columns = generated_data.pop("columns")
-    df = pandas.DataFrame.from_dict(data=generated_data, orient="index", columns=columns)
-    logger.success("Generated {} samples ({})", len(df), "|".join(df.columns))
-    if root_save_path is not None:
-        root_save_path.mkdir(parents=True, exist_ok=True)
-        df.to_csv(path_or_buf=root_save_path.joinpath("predictions.csv"), index_label="test_ID", encoding="utf-8")
-        sql_con = sqlite3.connect(database=str(root_save_path.joinpath("predictions.sql").absolute()))
-        df.to_sql(name="Predictions", con=sql_con, index_label="Test_ID", if_exists="replace")
-        pandas.DataFrame.from_records(
-            data=test, index=["test_{}".format(i) for i in range(len(test))]
-        ).to_sql(name="Data", con=sql_con, index_label="Test_ID", if_exists="replace")
-        sql_con.close()
+    logger.success("Generated {} samples ({})", len(generated_data), "|".join(columns))
 
-        score_matrix(ret_dict=generated_data, evaluation_instances=metrics_list)
-        columns_extended = list(generated_data[list(generated_data.keys())[0]].keys())
-        df = pandas.DataFrame.from_dict(data=generated_data, orient="index", columns=columns_extended)
-        df.to_csv(path_or_buf=root_save_path.joinpath("predictions_scores.csv"), index_label="test_ID",
-                  encoding="utf-8")
-        sql_con = sqlite3.connect(database=str(root_save_path.joinpath("predictions_scores.sql").absolute()))
-        df.to_sql(name="Predictions", con=sql_con, index_label="Test_ID", if_exists="replace")
-        pandas.DataFrame.from_records(
-            data=test, index=["test_{}".format(i) for i in range(len(test))]
-        ).to_sql(name="Data", con=sql_con, index_label="Test_ID", if_exists="replace")
-        sql_con.close()
+    alternating_frame_index = [(0, "")]
+    if alternating_frame_set is not None:
+        alternating_frame_index.extend([(f_id, name) for f_id, name in alternating_frame_set.data.iterrows()])
+    for alternating_frame_index, alternating_frame_name in alternating_frame_index:
+        logger.info("Let's collect and analyse the data for frame {}",
+                    "ORIGINAL" if alternating_frame_name == "" else alternating_frame_name)
+        current_dict = {k[:-(len(str(alternating_frame_index))+1)]: v
+                        for k, v in generated_data.items() if k.endswith("_{}".format(alternating_frame_index))}
+        df = pandas.DataFrame.from_dict(
+            data=current_dict,
+            orient="index", columns=columns)
+        file_ending = "{}{}".format("_{}".format(samples_to_be_generate) if samples_to_be_generate >= 1 else "",
+                                    "_{}".format(alternating_frame_name) if len(alternating_frame_name) >= 1 else "")
+        logger.debug("{} -> {} ({})", len(generated_data), len(current_dict), file_ending)
 
-        logger.success("Successfully saved the results of {} samples here in this dictionary: {}", len(df),
-                       root_save_path.absolute())
-    else:
-        logger.warning("Don't save the {} generations because you don't define a saving place", len(generated_data))
+        if root_save_path is not None:
+            root_save_path.mkdir(parents=True, exist_ok=True)
+            try:
+                df.to_csv(
+                    path_or_buf=root_save_path.joinpath("predictions{}.csv".format(file_ending)),
+                    index_label="test_ID",
+                    encoding="utf-8",
+                    errors="replace"
+                )
+                sql_con = sqlite3.connect(database=str(root_save_path.joinpath("predictions.sql").absolute()))
+                df.to_sql(name="Predictions{}".format(file_ending), con=sql_con, index_label="Test_ID", if_exists="replace")
+                pandas.DataFrame.from_records(
+                    data=test, index=["test_{}".format(i) for i in range(len(test))]
+                ).to_sql(name="Data", con=sql_con, index_label="Test_ID", if_exists="replace")
+                sql_con.close()
+            except sqlite3.OperationalError:
+                logger.opt(exception=True).warning("Was not able to write the SQL-Database (not up to date)")
+            except IOError:
+                logger.opt(exception=True).error("Was not able to write the CSV-File for the generated conclusions. "
+                                                 "Print them into the log: {}", df.to_string())
+
+            score_matrix(ret_dict=current_dict, evaluation_instances=metrics_list)
+            columns_extended = list(current_dict[list(current_dict.keys())[0]].keys())
+            df = pandas.DataFrame.from_dict(data=current_dict, orient="index", columns=columns_extended)
+            try:
+                df.to_csv(path_or_buf=root_save_path.joinpath("predictions_scores{}.csv".format(file_ending)),
+                          index_label="test_ID", encoding="utf-8", errors="replace")
+                sql_con = sqlite3.connect(database=str(root_save_path.joinpath("predictions_scores.sql").absolute()))
+                df.to_sql(name="Predictions{}".format(file_ending), con=sql_con, index_label="Test_ID", if_exists="replace")
+                pandas.DataFrame.from_records(
+                    data=test, index=["test_{}".format(i) for i in range(len(test))]
+                ).to_sql(name="Data", con=sql_con, index_label="Test_ID", if_exists="replace")
+                sql_con.close()
+
+                logger.success("Successfully saved the results of {} samples here in this dictionary: {}", len(df),
+                               root_save_path.absolute())
+            except sqlite3.OperationalError:
+                logger.opt(exception=True).info("Was not able to write the SQL-Database (not up to date)")
+            except IOError:
+                logger.opt(exception=True).warning("Was not able to write the CSV-File for the hot cherries. "
+                                                   "Print them into the log: {}", df.to_string())
+        else:
+            logger.warning("Don't save the {} generations because you don't define a saving place", len(current_dict))
 
