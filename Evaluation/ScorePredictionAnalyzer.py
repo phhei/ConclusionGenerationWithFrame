@@ -23,7 +23,9 @@ reference_scores: List[str] = ["rouge1", "rougeL", "bertscore_f1"
 exclude_scores: List[str] = ["rouge", "bertscore_precision", "bertscore_recall", "bertscore_f1"
                              #, "framescore_confidence", "framescore_precision", "framescore_score"
                              ]
-save_path: Path = predictions_scores_csv.parent.joinpath("linear_regression_cherry_picker", "-".join(reference_scores))
+save_path: Path = predictions_scores_csv.parent.joinpath(
+    "{}_linear_regression_cherry_picker".format(predictions_scores_csv.stem), "-".join(reference_scores)
+)
 
 
 def average_output(f_predictions_scores_csv: Path = predictions_scores_csv,
@@ -141,7 +143,9 @@ def average_output(f_predictions_scores_csv: Path = predictions_scores_csv,
     logger.success("Finished creating a average-stat with {} stats", len(f_ret))
 
     try:
-        with f_predictions_scores_csv.parent.joinpath("avg_stats.txt").open(mode="w", encoding="utf-8") as avg_writer:
+        with f_predictions_scores_csv.parent.joinpath(
+                "{}_avg_stats.txt".format(predictions_scores_csv.stem)
+        ).open(mode="w", encoding="utf-8") as avg_writer:
             pprint(
                 object=f_ret,
                 stream=avg_writer,
