@@ -80,12 +80,12 @@ def get_lm_score(sentences, tokenizer_lm: Optional[Any] = None, model_lm: Option
 
 def get_cola_score(sentences, cola_config: Optional[Any] = None, cola_tokenizer: Optional[Any] = None,
                    cola_model: Optional[Any] = None):
-    def load_pretrained_cola_model(model_name, saved_pretrained_CoLA_model_dir):
+    def load_pretrained_cola_model(model_name, saved_pretrained_cola_model_dir):
         config_class, model_class, tokenizer_class = (BertConfig, BertForSequenceClassification, BertTokenizer)
-        config = config_class.from_pretrained(saved_pretrained_CoLA_model_dir, num_labels=2, finetuning_task='CoLA') if cola_config is None else cola_config
-        tokenizer = tokenizer_class.from_pretrained(saved_pretrained_CoLA_model_dir, do_lower_case=0) if cola_tokenizer is None else cola_tokenizer
+        config = config_class.from_pretrained(saved_pretrained_cola_model_dir, num_labels=2, finetuning_task='CoLA') if cola_config is None else cola_config
+        tokenizer = tokenizer_class.from_pretrained(saved_pretrained_cola_model_dir, do_lower_case=0) if cola_tokenizer is None else cola_tokenizer
         if cola_model is None:
-            model = model_class.from_pretrained(saved_pretrained_CoLA_model_dir, from_tf=bool('.ckpt' in model_name), config=config).to(device)
+            model = model_class.from_pretrained(saved_pretrained_cola_model_dir, from_tf=bool('.ckpt' in model_name), config=config).to(device)
             model.eval()
         else:
             model = cola_model
@@ -137,9 +137,9 @@ def get_cola_score(sentences, cola_config: Optional[Any] = None, cola_tokenizer:
         return paragraph_score
 
     model_name = 'bert-base-cased'
-    #saved_pretrained_CoLA_model_dir = './cola_model/' + model_name + '/'
-    saved_pretrained_CoLA_model_dir = 'cola_model/'
-    tokenizer, model = load_pretrained_cola_model(model_name, saved_pretrained_CoLA_model_dir)
+    #saved_pretrained_cola_model_dir = './cola_model/' + model_name + '/'
+    saved_pretrained_cola_model_dir = 'cola_model/'
+    tokenizer, model = load_pretrained_cola_model(model_name, saved_pretrained_cola_model_dir)
     candidates = [y for x in sentences for y in x]
     sent_length = [len(x) for x in sentences]
     cola_score = evaluate_cola(model, candidates, tokenizer, model_name)

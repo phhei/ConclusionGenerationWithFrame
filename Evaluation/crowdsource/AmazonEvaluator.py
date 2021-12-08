@@ -175,7 +175,7 @@ def stat(do_restrictive_round: bool = True, excluded_users: Optional[List[str]] 
     # print(aspect_pairwise_matrix)
     sorted_categories = list(index_mapping.values())
     sorted_categories.sort()
-    empty_table = [["" for c in range(len(index_mapping))] for r in range(len(index_mapping))]
+    empty_table = [["" for c in range(len(index_mapping))] for _ in range(len(index_mapping))]
 
     # adds the data
     for key_aspect, value in aspect_pairwise_matrix.items():

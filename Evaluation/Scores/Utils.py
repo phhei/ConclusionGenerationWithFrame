@@ -1,13 +1,15 @@
-from const import FRAME_END_TOKEN, TOPIC_END_TOKEN
+from const import ISSUE_SPECIFIC_FRAME_END_TOKEN, GENERIC_MAPPED_FRAME_END_TOKEN, GENERIC_INFERRED_FRAME_END_TOKEN, \
+    TOPIC_END_TOKEN
 from loguru import logger
 
 
 def clean_premise(premise: str) -> str:
     logger.trace("OK, you want to remove the control code from the premise: \"{}\"", premise)
-    if FRAME_END_TOKEN in premise:
-        index = premise.index(FRAME_END_TOKEN)
-        logger.trace("Found the frame end token \"{}\" at position {} - cut", FRAME_END_TOKEN, index)
-        premise = premise[index + len(FRAME_END_TOKEN):]
+    for tok in [ISSUE_SPECIFIC_FRAME_END_TOKEN, GENERIC_MAPPED_FRAME_END_TOKEN, GENERIC_INFERRED_FRAME_END_TOKEN]:
+        if tok in premise:
+            index = premise.index(tok)
+            logger.trace("Found the frame end token \"{}\" at position {} - cut", tok, index)
+            premise = premise[index + len(tok):]
     if TOPIC_END_TOKEN in premise:
         index = premise.index(TOPIC_END_TOKEN)
         logger.trace("Found the topic end token \"{}\" at position {} - cut", TOPIC_END_TOKEN, index)

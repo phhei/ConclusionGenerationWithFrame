@@ -5,8 +5,8 @@ import pandas
 from typing import List, Union, Tuple
 from loguru import logger
 
-from const import FRAME_START_TOKEN, FRAME_END_TOKEN, TOPIC_START_TOKEN, TOPIC_END_TOKEN
 from Frames import FrameSet
+from MainUtils import retrieve_topic, retrieve_issue_specific_frame, retrieve_generic_frame
 
 
 def combine_generations(csv: List[Union[Path, str, Tuple[str, Union[Path, str]]]]) -> pandas.DataFrame:
@@ -93,27 +93,19 @@ def combine_generations(csv: List[Union[Path, str, Tuple[str, Union[Path, str]]]
     for index, data in df.iterrows():
         logger.trace("Extend row \"{}\" now...", index)
 
-        def extract_piece(s: str, start = FRAME_START_TOKEN, end = FRAME_END_TOKEN) -> str:
-            try:
-                return s[s.index(start)+len(start):s.index(end)]
-            except ValueError:
-                logger.opt(exception=True).debug("No {} PIECE {} available in \"{}\"", start, end, s)
-                return "not available"
-
         if len(input_rows) >= 1:
             for i in range(len(input_rows)):
-                topic = extract_piece(data[input_rows[i]], start=TOPIC_START_TOKEN, end=TOPIC_END_TOKEN)
+                topic = retrieve_topic(premise=data[input_rows[i]])
                 if topic != "not available":
                     logger.trace("Found suitable topic: {}", topic)
                     topics.append(topic)
                     break
 
-
         if specific_frame_col is not None:
-            specific_frames.append(extract_piece(data[specific_frame_col]))
+            specific_frames.append(retrieve_issue_specific_frame(premise=data[specific_frame_col]))
             logger.trace("Added issue-specific frame \"{}\"", specific_frames[-1])
         if generic_frame_col is not None:
-            generic_frames.append(extract_piece(data[generic_frame_col]))
+            generic_frames.append(retrieve_generic_frame(premise=data[generic_frame_col]))
             logger.trace("Added generic frame \"{}\"", generic_frames[-1])
 
         random_index = index

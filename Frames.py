@@ -10,26 +10,8 @@ import pandas
 import torch
 from loguru import logger
 
-if pathlib.Path.home().name == "Philipp":
-    glove_path = pathlib.Path.home().joinpath("Documents", "Einsortiertes", "Nach Lebensabschnitten einsortiert",
-                                              "Promotionszeit (2019-2023)", "Promotion", "Programming",
-                                              "_wordEmbeddings", "glove", "glove.840B.300d.txt")
-elif pathlib.Path.home().name == "pheinisch":
-    # ssh compute
-    glove_path = pathlib.Path("..", "glove", "glove.840B.300d.txt")
-else:
-    glove_path = None
-
-stop_words = {"i", "me", "my", "myself", "we", "our", "ours", "ourselves", "you", "your", "yours", "yourself",
-              "yourselves", "he", "him", "his", "himself", "she", "her", "hers", "herself", "it", "its", "itself",
-              "they", "them", "their", "theirs", "themselves", "what", "which", "who", "whom", "this", "that", "these",
-              "those", "am", "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "having", "do",
-              "does", "did", "doing", "a", "an", "the", "and", "but", "if", "or", "because", "as", "until", "while",
-              "of", "at", "by", "for", "with", "about", "against", "between", "into", "through", "during", "before",
-              "after", "above", "below", "to", "from", "up", "down", "in", "out", "on", "off", "over", "under", "again",
-              "further", "then", "once", "here", "there", "when", "where", "why", "how", "all", "any", "both", "each",
-              "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than",
-              "too", "very", "s", "t", "can", "will", "just", "don", "should", "now", "-", ">", "->"}
+from MainUtils import get_glove_w2v_model
+from MainUtils import stop_words
 
 
 class FrameSet:
@@ -77,22 +59,13 @@ class FrameSet:
 
         self.add_other = add_other
 
-        logger.info("Now load the word embeddings from \"{}\" - this may take a while...", glove_path.name)
-        if not glove_path.exists() or not glove_path.is_file():
-            logger.critical("The core, the word embeddings, are not loadable: {}", glove_path.absolute())
-            exit(-42)
-
-        self.w2v = dict()
-        with glove_path.open(mode="r", encoding="utf-8") as glove_reader:
-            for line in glove_reader:
-                splits = line.split(" ")
-                # logger.trace("Read word \"{}\" ({}d)", splits[0].strip(), len(splits[1:]))
-                self.w2v[splits[0].strip()] = numpy.fromiter(iter=splits[1:], dtype=numpy.float)
-        logger.success("Read successfully {} words from \"{}\"", len(self.w2v), glove_path.name)
-
+        self.w2v_model = get_glove_w2v_model()
         self.data.insert(loc=2, column="w2v_keywords_label",
                          value=[numpy.average(
-                             a=[self.w2v.get(s, numpy.zeros_like(self.w2v["the"]))for s in c.split(" ")], axis=0
+                             a=[self.w2v_model.get_vector(s, norm=True)
+                                if s in self.w2v_model else
+                                numpy.zeros((self.w2v_model.vector_size,), dtype=self.w2v_model.vectors.dtype)
+                                for s in c.split(" ")], axis=0
                          ) for c in self.data["keywords_label"]])
         logger.debug(self.data)
 
@@ -109,8 +82,11 @@ class FrameSet:
         self.data = self.data.append(
             pandas.DataFrame.from_records(
                 data=[("ecology", "ecology environmental sustainability",
-                       numpy.average([self.w2v.get("nature", numpy.zeros_like(self.w2v["the"])),
-                                      self.w2v.get("ecology", numpy.zeros_like(self.w2v["the"]))], axis=0),
+                       numpy.average([self.w2v_model.get_vector(s, norm=True)
+                                      if s in self.w2v_model else
+                                      numpy.zeros((self.w2v_model.vector_size,), dtype=self.w2v_model.vectors.dtype)
+                                      for s in ["nature", "ecology"]],
+                                     axis=0),
                        "ecological aspect, effects on the environment")],
                 columns=self.data.columns
             ),
@@ -200,7 +176,10 @@ class FrameSet:
                 issue_specific_frame_splits = ["other"]
 
             issue_specific_frame_vecs =\
-                [self.w2v.get(s, numpy.zeros_like(self.w2v["the"])) for s in issue_specific_frame_splits]
+                [self.w2v_model.get_vector(s, norm=True)
+                 if s in self.w2v_model else
+                 numpy.zeros((self.w2v_model.vector_size,), dtype=self.w2v_model.vectors.dtype)
+                 for s in issue_specific_frame_splits]
             logger.trace("Collected {} numpy-word-embeddings", len(issue_specific_frame_vecs))
 
             if semantic_reordering:

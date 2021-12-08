@@ -117,7 +117,9 @@ if __name__ == "__main__":
                           </fieldset>
                     """.format(index, optimize_input(df[column_for_premise][index]), df[combo[0]][index],
                                df[combo[1]][index], i, "__".join(combo),
-                               df["_topic"][index], df["_specific_frame"][index], df["_generic_frame"][index])
+                               df["_topic"][index],
+                               df["_specific_frame"][index].replace(to_replace="\"", value="&quot;"),
+                               df["_generic_frame"][index].replace(to_replace="\"", value="&quot;"))
 
                     if (df["_specific_frame"][index] != df["_generic_frame"][index]) and \
                             (not skip_generic_frame_question_when_other or df["_generic_frame"][index] != "other"):
@@ -128,8 +130,10 @@ if __name__ == "__main__":
                                 <input type="radio" value="conclusion2" name="{0}_FrameGen_{5}" onclick="FrameGen(false, '{0}_{4}');">
                               </fieldset>
                         """.format(index, optimize_input(df[column_for_premise][index]), df[combo[0]][index],
-                               df[combo[1]][index], i, "__".join(combo),
-                               df["_topic"][index], df["_specific_frame"][index], df["_generic_frame"][index])
+                                   df[combo[1]][index], i, "__".join(combo),
+                                   df["_topic"][index],
+                                   df["_specific_frame"][index].replace(to_replace="\"", value="&quot;"),
+                                   df["_generic_frame"][index].replace(to_replace="\"", value="&quot;"))
 
                     content += """
                     </div>

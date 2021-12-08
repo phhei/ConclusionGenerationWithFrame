@@ -10,14 +10,15 @@ from transformers import AutoTokenizer, PreTrainedTokenizer
 import torch
 
 from Frames import FrameSet
-from FrameClassifier import FrameClassifier
-from const import FRAME_START_TOKEN, FRAME_END_TOKEN, TOPIC_START_TOKEN, TOPIC_END_TOKEN
+from FrameClassifier import GenericFrameClassifier, IssueSpecificFrameClassifier
+
+from MainUtils import retrieve_topic, retrieve_generic_frame, retrieve_issue_specific_frame
 
 
-def get_frame_classifier(frame_set: FrameSet, preferred_model: str = "distilroberta-base",
-                         corpus_data: Optional[List[Union[torch.Tensor, Tuple[torch.Tensor, int]]]] = None,
-                         token_frame_start: Optional[int] = None, token_frame_end: Optional[int] = None,
-                         **kwargs) -> FrameClassifier:
+def get_generic_frame_classifier(frame_set: FrameSet, preferred_model: str = "distilroberta-base",
+                                 corpus_data: Optional[List[Union[torch.Tensor, Tuple[torch.Tensor, int]]]] = None,
+                                 token_frame_start: Optional[int] = None, token_frame_end: Optional[int] = None,
+                                 **kwargs) -> GenericFrameClassifier:
     """
     Retrieves / loads a fine-tuned Frame-Classifier (gets a line of text, predict a frame class following the frame_set)
 
@@ -129,13 +130,13 @@ def get_frame_classifier(frame_set: FrameSet, preferred_model: str = "distilrobe
     else:
         corpus_data = None
 
-    return FrameClassifier(model=model_path_fn, frame_set=frame_set,
-                           tokenizer=tokenizer, train_pairs=corpus_data, **kwargs)
+    return GenericFrameClassifier(model=model_path_fn, frame_set=frame_set, tokenizer=tokenizer,
+                                  train_pairs=corpus_data, **kwargs)
 
 
 @Metric.register(name="FrameScore", exist_ok=True)
 class FrameScore(ReferenceFreeMetric):
-    def __init__(self, frame_set: FrameSet, frame_classifier: FrameClassifier):
+    def __init__(self, frame_set: FrameSet, frame_classifier: GenericFrameClassifier):
         super(FrameScore, self).__init__()
 
         self.frame_set = frame_set
@@ -158,24 +159,13 @@ class FrameScore(ReferenceFreeMetric):
                              self.frame_set.data["label"])
 
                 try:
-                    if FRAME_START_TOKEN in summary[0] and FRAME_END_TOKEN in summary[0]:
-                        expected_frame = \
-                            summary[0][summary[0].index(FRAME_START_TOKEN) + len(FRAME_START_TOKEN):
-                                       summary[0].index(FRAME_END_TOKEN)].strip()
-                    else:
-                        logger.warning("\"{}\" contains no information about the expected frame!", summary[0])
-                        expected_frame = self.frame_set.name
-
-                    if TOPIC_START_TOKEN in summary[0] and TOPIC_END_TOKEN in summary[0]:
-                        topic = summary[0][summary[0].index(TOPIC_START_TOKEN) + len(TOPIC_START_TOKEN):
-                                           summary[0].index(TOPIC_END_TOKEN)].strip()
-                    else:
-                        logger.trace("\"{}\" contains no information about the current topic!", summary[0])
-                        topic = None
+                    expected_frame = retrieve_generic_frame(premise=summary[0], default="n/a")
+                    if expected_frame == "n/a":
+                        expected_frame = retrieve_issue_specific_frame(premise=summary[0], default=self.frame_set.name)
 
                     expected_frame_id = self.frame_set.issues_specific_frame_to_generic(
                         issue_specific_frame=expected_frame,
-                        topic=topic,
+                        topic=retrieve_topic(premise=summary[0]),
                         fetch_column=None,
                         semantic_reordering=False,
                         remove_stopwords=False

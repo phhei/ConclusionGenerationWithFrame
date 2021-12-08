@@ -10,36 +10,49 @@ import transformers
 from loguru import logger
 
 import Trainer
+import const
+from FrameClassifier import GenericFrameClassifier
 from Evaluation.Scores.BERTscore import BertScore, BertScorePremConc
 from Evaluation.Evaluate import score_matrix
 from Evaluation.Scores.GRUENscore import GRUENMetric
 from Evaluation.Scores.Rougescore import RougeMetric
 from Evaluation.Scores.SurfaceScore import LengthScore, ClaimLikeScore
-from Evaluation.Scores.FrameIdentifier import FrameScore, get_frame_classifier
+from Evaluation.Scores.FrameIdentifier import FrameScore, get_generic_frame_classifier
 from Evaluation.Scores.StanceRelationScore import StanceScore
 from Frames import FrameSet
 from Transformer import FrameBiasedT5ForConditionalGeneration
-from const import FRAME_START_TOKEN, FRAME_END_TOKEN, TOPIC_START_TOKEN, TOPIC_END_TOKEN
 
-#INPUT params
+# INPUT params
 datasets: List[Path] = [Path("Webis-argument-framing.csv")]
-frame_datasets: List[Tuple[Optional[Path], Tuple[str]]] = \
+generic_frame_datasets: List[Tuple[Optional[Path], Tuple[str]]] = \
     [(None, ("frame_index", "input_ids")),
      (None, ("frame_index", "Yinput_ids")),
      (Path("frame_sets", "frame_datasets", "Media-frames-immigrationsamesexsmoking.csv"),
       ("frame", "conclusion"))
      ]
-limit_samples: int = -1
+limit_samples: int = int(sys.argv[sys.argv.index("limit_samples") + 1]) if "limit_samples" in sys.argv else -1
 train_val_test_topic_distinct: bool = limit_samples < 0 or limit_samples >= 200
 max_length_premise: int = 128
 max_length_conclusion: int = 24
-include_frame: bool = \
-    sys.argv[sys.argv.index("include_frame") + 1].upper() == "TRUE" if "include_frame" in sys.argv else True
+include_issue_specific_frame: bool = \
+    sys.argv[sys.argv.index("include_issue_specific_frame") + 1].upper() == "TRUE" if "include_issue_specific_frame" in sys.argv else True
+if include_issue_specific_frame:
+    max_length_premise += 4
+include_generic_mapped_frame: bool = \
+    sys.argv[sys.argv.index("include_generic_mapped_frame") + 1].upper() == "TRUE" if "include_issue_specific_frame" in sys.argv else False
+if include_generic_mapped_frame:
+    max_length_premise += 4
+include_generic_inferred_frame: bool = \
+    sys.argv[sys.argv.index("include_generic_inferred_frame") + 1].upper() == "TRUE" if "include_generic_inferred_frame" in sys.argv else False
+if include_generic_inferred_frame:
+    max_length_premise += 4
 frame_set: Optional[str] = sys.argv[sys.argv.index("frame_set")+1] if "frame_set" in sys.argv else None # media_frames
 add_ecologic_frame: Optional[bool] = \
     sys.argv[sys.argv.index("add_ecologic_frame") + 1].upper() == "TRUE" if "add_ecologic_frame" in sys.argv else None
 include_topic: bool = \
     sys.argv[sys.argv.index("include_topic") + 1].upper() == "TRUE" if "include_topic" in sys.argv else True
+if include_topic:
+    max_length_premise += 4
 
 # TRAINING parameters
 label_smoothing: Optional[float] = \
@@ -97,32 +110,57 @@ def make_topic_distinct(split_1: pandas.DataFrame, split_2: pandas.DataFrame) ->
     return split_2.drop(index=intersection.index, inplace=False, errors="ignore")
 
 
-def convert_samples_to_input_str(split: pandas.DataFrame,
-                                 frame_start: Optional[str] = FRAME_START_TOKEN,
-                                 frame_end: Optional[str] = FRAME_END_TOKEN,
-                                 topic_start: Optional[str] = TOPIC_START_TOKEN,
-                                 topic_end: Optional[str] = TOPIC_END_TOKEN) -> List[Tuple[str, str, int]]:
+def convert_samples_to_input_str(split: pandas.DataFrame) -> List[Tuple[str, str, int]]:
     def control_code(row) -> str:
         ret = " "
-        if include_frame:
+        if include_topic:
+            ret += "{} {} {} ".format(
+                const.TOPIC_START_TOKEN,
+                row["topic"],
+                const.TOPIC_END_TOKEN
+            )
+        if include_issue_specific_frame:
+            ret += "{} {} {} ".format(
+                const.ISSUE_SPECIFIC_FRAME_START_TOKEN,
+                row["frame"],
+                const.ISSUE_SPECIFIC_FRAME_END_TOKEN
+            )
+        if include_generic_mapped_frame:
             if cluster_frame is None:
-                ret += "{}{}{} ".format("" if frame_start is None else "{} ".format(frame_start),
-                                        row["frame"],
-                                        "" if frame_end is None else " {}".format(frame_end))
+                logger.warning("You want to include the mapped generic frame, but you didn't define a frame set! "
+                               "Hint: define \"frame_set\"")
             else:
-                ret += "{}{}{} ".format(
-                    "" if frame_start is None else "{} ".format(frame_start),
+                ret += "{} {} {} ".format(
+                    const.GENERIC_MAPPED_FRAME_START_TOKEN,
                     cluster_frame.issues_specific_frame_to_generic(
                         issue_specific_frame=row["frame"], topic=row["topic"] if include_topic else None
                     ),
-                    "" if frame_end is None else " {}".format(frame_end)
+                    const.GENERIC_MAPPED_FRAME_END_TOKEN
                 )
-        if include_topic:
-            ret += "{}{}{} ".format(
-                "" if topic_start is None else "{} ".format(topic_start),
-                row["topic"],
-                "" if topic_end is None else " {}".format(topic_end)
-            )
+        if include_generic_inferred_frame:
+            if cluster_frame is None:
+                logger.warning("You want to include the inferred generic frame, but you didn't define a frame set! "
+                               "Hint: define \"frame_set\"")
+            elif generic_frame_classifier_model is None:
+                logger.warning("You want to include the inferred generic frame, but you didn't define a frame set! "
+                               "Hint: define \"preferred_model_for_frame_identifier\"")
+            else:
+                try:
+                    ret += "{} {} {} ".format(
+                        const.GENERIC_INFERRED_FRAME_START_TOKEN,
+                        cluster_frame.data.iloc[
+                            torch.argmax(generic_frame_classifier_model.predict(sample=row["conclusion"]), dim=-1).item()
+                        ]["keywords_label"],
+                        const.GENERIC_INFERRED_FRAME_END_TOKEN
+                    )
+                except ValueError:
+                    logger.opt(exception=True).warning("Failure by extracting the index of the most probable inferred "
+                                                       "frame class for including the inferred generic {} frame {}",
+                                                       const.GENERIC_INFERRED_FRAME_START_TOKEN,
+                                                       const.GENERIC_INFERRED_FRAME_START_TOKEN)
+                except KeyError:
+                    logger.opt(exception=True).error("Your frame set us malformed - no \"keywords_label\" ({})",
+                                                     cluster_frame)
         return ret.rstrip()
     return [("summarize{}: {}".format(control_code(row), str(row["premise"]).strip(" \"'")), row["conclusion"],
              0 if cluster_frame is None else
@@ -225,8 +263,56 @@ if __name__ == '__main__':
     else:
         cluster_frame = None
 
+    if cluster_frame is not None and preferred_model_for_frame_identifier is not None:
+        frame_tokenizer: transformers.PreTrainedTokenizer = transformers.AutoTokenizer.from_pretrained(
+            pretrained_model_name_or_path=preferred_model_for_frame_identifier
+        )
+        generic_frame_classifier_model: GenericFrameClassifier = get_generic_frame_classifier(
+            frame_set=cluster_frame,
+            preferred_model=preferred_model_for_frame_identifier,
+            corpus_data=[(frame_tokenizer(text=content["conclusion"], padding="max_length",
+                                          max_length=max_length_conclusion, truncation=True,
+                                          is_split_into_words=False,
+                                          return_tensors="pt")["input_ids"][0],
+                          cluster_frame.issues_specific_frame_to_generic(
+                              issue_specific_frame=content["frame"],
+                              topic=str(content["argument_id"])[:str(content["argument_id"]).index("1")],
+                              fetch_column=None,
+                              semantic_reordering=False,
+                              remove_stopwords=True
+                          ) if cluster_frame is not None else int(content["frame_id"]))
+                         for index, content in
+                         pandas.read_csv(
+                             filepath_or_buffer=str(
+                                 Path("frame_sets", "frame_datasets",
+                                      "Media-frames-immigrationsamesexsmoking.csv").absolute()
+                             ),
+                             delimiter="|",
+                             verbose=False,
+                             quotechar="\"",
+                             doublequote=True
+                         ).iterrows()
+                         if "headline" not in content["frame"]
+                         ],
+            retrain=False,
+            max_length=max_length_conclusion,
+            label_smoothing=.1 if label_smoothing is None else label_smoothing,
+            handle_raw_dataset=False
+        )
+    else:
+        generic_frame_classifier_model = None
+
     new_special_tokens = {
-        "additional_special_tokens": [FRAME_START_TOKEN, FRAME_END_TOKEN, TOPIC_START_TOKEN, TOPIC_END_TOKEN]
+        "additional_special_tokens": [
+            const.TOPIC_START_TOKEN,
+            const.TOPIC_END_TOKEN,
+            const.ISSUE_SPECIFIC_FRAME_START_TOKEN,
+            const.ISSUE_SPECIFIC_FRAME_END_TOKEN,
+            const.GENERIC_MAPPED_FRAME_START_TOKEN,
+            const.GENERIC_MAPPED_FRAME_END_TOKEN,
+            const.GENERIC_INFERRED_FRAME_START_TOKEN,
+            const.GENERIC_INFERRED_FRAME_END_TOKEN
+        ]
     }
     num_added = tokenizer.add_special_tokens(special_tokens_dict=new_special_tokens)
     logger.info("Added the following {} special tokens: {} (vocab size is {} now)",
@@ -292,7 +378,7 @@ if __name__ == '__main__':
                                                     fn_tokenizer=tokenizer,
                                                     max_length=(max_length_premise, max_length_conclusion))
 
-    frame_dict = None
+    generic_frame_dict = None
     if isinstance(model, str):
         if cluster_frame is None:
             model = transformers.T5ForConditionalGeneration.from_pretrained(model)
@@ -301,21 +387,22 @@ if __name__ == '__main__':
         else:
             logger.warning("We don't have a proper model until yet, only a string \"{}\". "
                            "We assume that the frame-related FrameBiasedT5ForConditionalGeneration is needed.", model)
-            frame_dict = cluster_frame.get_frame_count_dict(
+            generic_frame_dict = cluster_frame.get_frame_count_dict(
                 corpora=[[(train_x[fd_column[0]][i].item(),
-                            train_y[fd_column[1][1:]][i] if fd_column[1].startswith("Y") else train_x[fd_column[1]][i])
+                           train_y[fd_column[1][1:]][i] if fd_column[1].startswith("Y") else train_x[fd_column[1]][i])
                           for i in range(len(train_x["input_ids"]))] if fd_name is None else
                           [(i[1][fd_column[0]],
                             tokenizer(text=i[1][fd_column[1]], padding=False, truncation=False, return_tensors="pt",
                                       is_split_into_words=False)["input_ids"][0])
                            for i in pandas.read_csv(str(fd_name.absolute()), delimiter="|", verbose=True).iterrows()
                            if "headline" not in i[1][fd_column[0]]]
-                         for fd_name, fd_column in frame_datasets],
+                         for fd_name, fd_column in generic_frame_datasets],
                 vocab_size=len(tokenizer.get_vocab())
             )
             frame_dict_model = \
-                {k: torch.log(1+v)/max(torch.max(torch.log(1+v)), math.log(2)) for k, v in frame_dict.items()}
-            model = FrameBiasedT5ForConditionalGeneration.from_pretrained(model, frame_dict=frame_dict_model, fast=True,
+                {k: torch.log(1+v)/max(torch.max(torch.log(1+v)), math.log(2)) for k, v in generic_frame_dict.items()}
+            model = FrameBiasedT5ForConditionalGeneration.from_pretrained(model,
+                                                                          frame_dict=frame_dict_model, fast=True,
                                                                           sequence_length=max_length_conclusion)
 
     model.resize_token_embeddings(new_num_tokens=len(tokenizer.get_vocab()))
@@ -344,14 +431,14 @@ if __name__ == '__main__':
                 logger.error("You can't have a proper frame-smoothing (frame_vocab_smoothing_factor: {}) "
                              "when you ignore the label_smoothing in general! Please set a value for label_smoothing",
                              frame_vocab_smoothing_factor)
-            elif frame_dict is None:
+            elif generic_frame_dict is None:
                 logger.warning("We didn't compute a frame dictionary which is needed for "
                                "frame_vocab_smoothing_factor = \"{}\"", frame_vocab_smoothing_factor)
             else:
                 additional_training_args["frame_words"] = \
                     {f: 1 - frame_vocab_smoothing_factor +
                         (2 * frame_vocab_smoothing_factor * (1 + torch.negative(v/max(1, torch.max(v)))))
-                     for f, v in frame_dict.items()}
+                     for f, v in generic_frame_dict.items()}
                 logger.debug("The frame_vocab_smoothing_dict was calculated. Contains {} entries.",
                              len(additional_training_args["frame_words"]))
                 if -1 not in additional_training_args["frame_words"].keys():
@@ -390,45 +477,11 @@ if __name__ == '__main__':
         LengthScore(include_premise=True, filter_stopwords=True),
         ClaimLikeScore()
     ]
-    if cluster_frame is not None and preferred_model_for_frame_identifier is not None:
-        frame_tokenizer: transformers.PreTrainedTokenizer = transformers.AutoTokenizer.from_pretrained(
-            pretrained_model_name_or_path=preferred_model_for_frame_identifier
-        )
+    if cluster_frame is not None and generic_frame_classifier_model is not None:
         metrics_list.append(
             FrameScore(
                 frame_set=cluster_frame,
-                frame_classifier=get_frame_classifier(
-                    frame_set=cluster_frame,
-                    preferred_model=preferred_model_for_frame_identifier,
-                    corpus_data=[(frame_tokenizer(text=content["conclusion"], padding="max_length",
-                                                  max_length=max_length_conclusion, truncation=True,
-                                                  is_split_into_words=False,
-                                                  return_tensors="pt")["input_ids"][0],
-                                  cluster_frame.issues_specific_frame_to_generic(
-                                      issue_specific_frame=content["frame"],
-                                      topic=str(content["argument_id"])[:str(content["argument_id"]).index("1")],
-                                      fetch_column=None,
-                                      semantic_reordering=False,
-                                      remove_stopwords=True
-                                  ) if cluster_frame is not None else int(content["frame_id"]))
-                                 for index, content in
-                                 pandas.read_csv(
-                                     filepath_or_buffer=str(
-                                         Path("frame_sets", "frame_datasets",
-                                              "Media-frames-immigrationsamesexsmoking.csv").absolute()
-                                     ),
-                                     delimiter="|",
-                                     verbose=False,
-                                     quotechar="\"",
-                                     doublequote=True
-                                 ).iterrows()
-                                 if "headline" not in content["frame"]
-                                 ],
-                    retrain=False,
-                    max_length=max_length_conclusion,
-                    label_smoothing=.1 if label_smoothing is None else label_smoothing,
-                    handle_raw_dataset=False
-                )
+                frame_classifier=generic_frame_classifier_model
             )
         )
         logger.success("Appended a FrameScorer: {} (base: {})", metrics_list[-1], preferred_model_for_frame_identifier)

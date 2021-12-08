@@ -10,7 +10,7 @@ from Evaluation.Scores.Rougescore import RougeMetric
 from Evaluation.Scores.BERTscore import BertScore, BertScorePremConc
 from Evaluation.Scores.GRUENscore import GRUENMetric
 from Evaluation.Scores.SurfaceScore import LengthScore, ClaimLikeScore
-from Evaluation.Scores.FrameIdentifier import FrameScore, get_frame_classifier
+from Evaluation.Scores.FrameIdentifier import FrameScore, get_generic_frame_classifier
 from Frames import FrameSet
 
 
@@ -319,7 +319,7 @@ class CherryPickerSelection(dict):
                 frame_classifier = None
                 logger.warning("Will ignore all Cherry-Picker-components which consider the [generic] frame.")
             else:
-                frame_classifier = get_frame_classifier(frame_set=frame_set, **kwargs)
+                frame_classifier = get_generic_frame_classifier(frame_set=frame_set, **kwargs)
         else:
             frame_set = None
             frame_classifier = None

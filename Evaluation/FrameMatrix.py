@@ -7,7 +7,7 @@ from Frames import FrameSet
 from pathlib import Path
 from loguru import logger
 
-from const import FRAME_START_TOKEN, FRAME_END_TOKEN
+from MainUtils import retrieve_generic_frame
 
 os.chdir("../")
 
@@ -24,13 +24,6 @@ exclude_unfitting_original_samples: bool = True
 exclude_unfitting_modified_samples: bool = True
 
 columns_for_rating = ["bertscore_f1", "rouge1", "rougeL"]
-
-
-def extract_frame(s: str) -> str:
-    if isinstance(s, str) and FRAME_START_TOKEN in s and FRAME_END_TOKEN in s:
-        return s[s.index(FRAME_START_TOKEN)+len(FRAME_START_TOKEN):s.index(FRAME_END_TOKEN)].strip()
-
-    return "other"
 
 
 def extract_modified_frame(path: str) -> str:
@@ -65,6 +58,7 @@ if __name__ == "__main__":
         exit(-1)
 
     if alternative_frame_set is None:
+        # noinspection PyUnboundLocalVariable
         alternative_frames = {lbl for df, lbl in df_other_framed_cherry_picked}
     else:
         alternative_frames = set(alternative_frame_set.data["label"].values)
@@ -81,7 +75,7 @@ if __name__ == "__main__":
             if alternative_frame_set is not None and exclude_unfitting_modified_samples:
                 df.drop(
                     index=[i for i, c in df.iterrows()
-                           if extract_frame(c["input"]).lower()
+                           if retrieve_generic_frame(premise=c["input"]).lower()
                            not in alternative_frame_set.data["keywords_label"].values],
                     inplace=True
                 )
@@ -99,9 +93,10 @@ if __name__ == "__main__":
             valid_frame_labels = set(original_frame_set.data["keywords_label"].values)
             if include_other:
                 valid_frame_labels.add("other")
+            # noinspection PyUnboundLocalVariable
             df_original_framed_cherry_picked.drop(
                 index=[i for i, c in df_original_framed_cherry_picked.iterrows()
-                       if extract_frame(c["input"]).lower() not in valid_frame_labels],
+                       if retrieve_generic_frame(premise=c["input"], default="other").lower() not in valid_frame_labels],
                 inplace=True
             )
 
@@ -113,7 +108,8 @@ if __name__ == "__main__":
         exit(-hash("input"))
 
     if original_frame_set is None:
-        original_frames = {extract_frame(d["input"]) for _, d in df_original_framed_cherry_picked.iterrows()}
+        original_frames = \
+            {retrieve_generic_frame(premise=d["input"]) for _, d in df_original_framed_cherry_picked.iterrows()}
     else:
         original_frames = set(original_frame_set.data["label"].values)
     logger.info("OK, we'll test all original frames: {} ({})", len(original_frames), original_frame_set)
@@ -147,9 +143,9 @@ if __name__ == "__main__":
         matrix[original] = dict()
         important_rows: pandas.DataFrame = big_df.drop(
             index=[i for i, d in big_df.iterrows() if
-                   (original_frame_set is None and extract_frame(d["original#input"]) != original) or
+                   (original_frame_set is None and retrieve_generic_frame(d["original#input"]) != original) or
                    (original_frame_set is not None and original_frame_set.issues_specific_frame_to_generic(
-                       issue_specific_frame=extract_frame(d["original#input"]),
+                       issue_specific_frame=retrieve_generic_frame(d["original#input"]),
                        semantic_reordering=False,
                        fetch_column="label") != original)],
             inplace=False
@@ -214,7 +210,7 @@ if __name__ == "__main__":
                             logger.info("The sample \"{}\" reached a better score in \"{}\" "
                                         "framed by the alternative \"{}\"", rid, rating, alternative)
                             better_conclusion_col = {c for c in important_cols if c.endswith("selected_prediction")}
-                            logger.debug("Sample \"{}\": \"{}\" -> \"{}\" (better than \"{}\" w.r.t.\"{}\"",
+                            logger.debug("Sample \"{}\": \"{}\" -> \"{}\" (better than \"{}\" w.r.t.\"{}\")",
                                          rid,
                                          data.get("original#input", "n/a"),
                                          data.get(better_conclusion_col.pop(), "n/a")

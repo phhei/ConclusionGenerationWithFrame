@@ -110,7 +110,8 @@ class BertScorePremConc(ReferenceFreeMetric):
             for summary in summaries:
                 logger.trace("Input consists of two parts: premise: \"{}\" --> conclusion: \"{}\"", summary[0],
                              summary[1])
-                cd = self.scorer.score(refs=[clean_premise(summary[0])], cands=[summary[1]], verbose=False, return_hash=False)
+                cd = self.scorer.score(refs=[clean_premise(summary[0])], cands=[summary[1]], verbose=False,
+                                       return_hash=False)
                 if self.only_precision:
                     d = {
                         "bertscorePremCon": switch_score(cd[0])
