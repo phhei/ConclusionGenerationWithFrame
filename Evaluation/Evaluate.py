@@ -10,7 +10,7 @@ from Evaluation.Scores.Rougescore import RougeMetric
 from Evaluation.Scores.BERTscore import BertScore, BertScorePremConc
 from Evaluation.Scores.GRUENscore import GRUENMetric
 from Evaluation.Scores.SurfaceScore import LengthScore, ClaimLikeScore
-from Evaluation.Scores.FrameIdentifier import FrameScore, get_generic_frame_classifier
+from Evaluation.Scores.FrameIdentifier import GenericFrameScore, get_generic_frame_classifier
 from Frames import FrameSet
 
 
@@ -331,8 +331,8 @@ class CherryPickerSelection(dict):
                                  LengthScore(filter_stopwords=True), "LengthScore_content_word_ratio", 1,
                                  ClaimLikeScore(), "ClaimLikeScore_summary", 5)
         self["BERTPicker"] = (BertScorePremConc(), "bertscorePremCon")
-        self["FramePicker"] = () if frame_set is None else (FrameScore(frame_set=frame_set,
-                                                                       frame_classifier=frame_classifier),
+        self["FramePicker"] = () if frame_set is None else (GenericFrameScore(frame_set=frame_set,
+                                                                              frame_classifier=frame_classifier),
                                                             "framescore_score")
         comprehensive_picker = [GRUENMetric(), "GRUEN", 10,
                                 LengthScore(filter_stopwords=True, include_premise=True), "LengthScore_relative", 2,
@@ -340,7 +340,7 @@ class CherryPickerSelection(dict):
                                 ClaimLikeScore(), "ClaimLikeScore_summary", 5,
                                 BertScorePremConc(), "bertscorePremCon", 12]
         if frame_set is not None or frame_classifier is not None:
-            comprehensive_picker.extend([FrameScore(frame_set=frame_set, frame_classifier=frame_classifier),
+            comprehensive_picker.extend([GenericFrameScore(frame_set=frame_set, frame_classifier=frame_classifier),
                                          "framescore_score", 15])
         self["ComprehensivePicker"] = tuple(comprehensive_picker)
         self["CheaterPicker"] = (RougeMetric(rouge_types=["rougeL"]), "rougeL", 1,

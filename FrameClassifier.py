@@ -59,9 +59,9 @@ class RegressionDataset(Dataset):
         if "token_type_ids" in self.tokenizer.model_input_names:
             ret["token_type_ids"] = torch.squeeze(self.data[index][0]["token_type_ids"])
         else:
-            logger.warning("The dataset can't forward the \"token_type_ids\" to the model! "
-                           "Maybe not the best model choice for a [SEP]-task? Throw away: {}",
-                           torch.squeeze(self.data[index][0]["token_type_ids"]))
+            logger.trace("The dataset can't forward the \"token_type_ids\" to the model! "
+                         "Maybe not the best model choice for a [SEP]-task? Throw away: {}",
+                         torch.squeeze(self.data[index][0]["token_type_ids"]))
         return ret
 
     def __len__(self) -> int:
@@ -205,7 +205,7 @@ class GenericFrameClassifier(FrameClassifier):
             self.out_dir: Path = \
                 self.model if isinstance(self.model, Path) else Path("frame_classifier",
                                                                      str(self.frame_set),
-                                                                     self.model.config.model_type.replace("/", "_"))
+                                                                     self.model.name_or_path.replace("/", "_"))
             self.train(train_pairs=train_pairs, **kwargs)
 
     def train(self, train_pairs: List[Tuple[Union[str, torch.Tensor], int]], **kwargs) -> None:
@@ -316,7 +316,7 @@ class IssueSpecificFrameClassifier(FrameClassifier):
             self.out_dir: Path = \
                 self.model if isinstance(self.model, Path) else Path("frame_classifier",
                                                                      "issue_specific",
-                                                                     self.model.config.model_type.replace("/", "_"))
+                                                                     self.model.name_or_path.replace("/", "_"))
             self.train(train_pairs=train_pairs, **kwargs)
 
     def train(self, train_pairs: List[Tuple[str, str]], **kwargs) -> None:
@@ -324,8 +324,8 @@ class IssueSpecificFrameClassifier(FrameClassifier):
                     self.model.config.model_type, len(train_pairs))
 
         issue_specific_frames = \
-            {frame: [t.strip(" ,:") for t in frame.replace("-", " ").replace("/", " ").split(" ")
-                     if t.strip() not in stop_words and len(t) > 1]
+            {frame: [t_strip for t in frame.replace("-", " ").replace("/", " ").split(" ")
+                     if (t_strip := t.strip(" ,:.?!")) not in stop_words and len(t_strip) > 1]
              for _, frame in train_pairs}
         logger.info("First of all, let's compute a wmd-issue-specific-frame-matrix ({} unique issue-specific frames)",
                     len(issue_specific_frames))
@@ -344,16 +344,28 @@ class IssueSpecificFrameClassifier(FrameClassifier):
 
         enriched_train_pairs: List[Tuple[Tuple[str, str], float]] = []
         for conclusion, frame in train_pairs:
-            distances = [(comp_frame, distance) for comp_frame, distance in distance_matrix[frame].items()]
+            distances = [(comp_frame, distance) for comp_frame, distance in distance_matrix[frame].items()
+                         if distance != float("inf")]
+            # for i in range(len(distances)):
+            #     if distances[i][1] == float("inf"):
+            #         comp_frame, _ = distances.pop(i)
+            #         logger.warning("There is no WMDistance between {} {} and {} {} -- ignore",
+            #                        frame, issue_specific_frames[frame], comp_frame, issue_specific_frames[comp_frame])
             distances.sort(key=lambda d: d[1])
             logger.trace("For \"{}\", the closest issue-specific-frames are {}, the most opposite are {}",
                          distances[:5], distances[-5:])
             enriched_train_pairs.append(((conclusion, frame), 1.))
-            max_distance_frame, max_distance_value = distances.pop()
-            logger.debug("\"{}\" <-{}-> \"{}\"", frame, round(max_distance_value, 2), max_distance_frame)
-            enriched_train_pairs.append(((conclusion, max_distance_frame), 0.))
-            random_pull_frame, random_pull_value = choice(distances)
-            enriched_train_pairs.append(((conclusion, random_pull_frame), 1.-random_pull_value/max_distance_value))
+            try:
+                max_distance_frame, max_distance_value = distances.pop()
+                logger.debug("\"{}\" <-{}-> \"{}\"", frame, round(max_distance_value, 2), max_distance_frame)
+                enriched_train_pairs.append(((conclusion, max_distance_frame), 0.))
+                random_pull_frame, random_pull_value = choice(distances)
+                enriched_train_pairs.append(((conclusion, random_pull_frame),
+                                             1. - random_pull_value / max_distance_value))
+            except IndexError:
+                logger.opt(exception=False).warning("WMD-calculation failed by \"{}\" ({})", frame,
+                                                    issue_specific_frames[frame])
+                enriched_train_pairs.append(((conclusion, choice(list(distance_matrix[frame].keys()))), 0.))
 
         logger.success("Successfully enriched the training data: {}->{} samples, for example: {}",
                        len(train_pairs), len(enriched_train_pairs),
@@ -390,7 +402,7 @@ class IssueSpecificFrameClassifier(FrameClassifier):
                 do_predict=True,
                 evaluation_strategy="epoch",
                 prediction_loss_only=False,
-                num_train_epochs=7,
+                num_train_epochs=4,
                 warmup_steps=100 if len(enriched_train_pairs) >= 200 else 1,
                 learning_rate=3e-4 / (1 + math.log10(len(enriched_train_pairs))),
                 log_level="info",
@@ -451,7 +463,7 @@ class IssueSpecificFrameClassifier(FrameClassifier):
     def __str__(self) -> str:
         return super().__str__()
 
-    def predict(self, sample: str, apply_softmax: bool = False):
+    def predict(self, sample: Tuple[str, str], apply_softmax: bool = False):
         if apply_softmax:
             logger.warning("It's not sensible to apply softmax on a single value!")
         return super().predict(sample, apply_softmax)
@@ -481,7 +493,6 @@ if __name__ == "__main__":
     logger.info("############################# OK, now issue-specific #############################")
     classifier = IssueSpecificFrameClassifier(
         model="distilbert-base-uncased",
-        frame_set=FrameSet(frame_set=Path("frame_sets", "neumann_frames.csv"), add_other=False),
         train_pairs=[("Bert Model transformer with a sequence classification/regression head on top "
                       "(a linear layer on top of the pooled output) e.g. for GLUE tasks.", "inform"),
                      ("This model inherits from PreTrainedModel.", "info"),

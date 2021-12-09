@@ -14,6 +14,9 @@ from FrameClassifier import GenericFrameClassifier, IssueSpecificFrameClassifier
 
 from MainUtils import retrieve_topic, retrieve_generic_frame, retrieve_issue_specific_frame
 
+##############################################################################################
+# ################################### FOR GENERIC FRAMES #####################################
+##############################################################################################
 
 def get_generic_frame_classifier(frame_set: FrameSet, preferred_model: str = "distilroberta-base",
                                  corpus_data: Optional[List[Union[torch.Tensor, Tuple[torch.Tensor, int]]]] = None,
@@ -134,10 +137,10 @@ def get_generic_frame_classifier(frame_set: FrameSet, preferred_model: str = "di
                                   train_pairs=corpus_data, **kwargs)
 
 
-@Metric.register(name="FrameScore", exist_ok=True)
-class FrameScore(ReferenceFreeMetric):
+@Metric.register(name="GenericFrameScore", exist_ok=True)
+class GenericFrameScore(ReferenceFreeMetric):
     def __init__(self, frame_set: FrameSet, frame_classifier: GenericFrameClassifier):
-        super(FrameScore, self).__init__()
+        super(GenericFrameScore, self).__init__()
 
         self.frame_set = frame_set
         self.frame_classifier = frame_classifier
@@ -193,5 +196,102 @@ class FrameScore(ReferenceFreeMetric):
                         }
                     }
                 metrics_list.append(MetricsDict(d))
+            metrics_lists.append(metrics_list)
+        return metrics_lists
+
+#####################################################################################################
+# ################################### FOR ISSUE-SPECIFIC FRAMES #####################################
+#####################################################################################################
+
+
+def get_issue_specific_frame_classifier(preferred_model: str = "distilroberta-base",
+                                        corpus_data: Optional[Tuple[str, str]] = None,
+                                        **kwargs) -> IssueSpecificFrameClassifier:
+    model_path = Path("frame_classifier", "issue_specific", preferred_model.replace("/", "_"))
+
+    if model_path.exists():
+        logger.success("You desired model \"{}\" exists already :)", model_path.name)
+
+        if "retrain" in kwargs:
+            retrain = kwargs.pop("retrain")
+        else:
+            retrain = False
+        if model_path.joinpath("metrics.txt").exists():
+            logger.debug("Having following stats about the model (retrieved from {}):", model_path)
+            logger.info(model_path.joinpath("metrics.txt").read_text(encoding="utf-8", errors="ignore"))
+        else:
+            logger.warning("Found no metrics-file (expected at: \"{}\")... maybe something went wrong?",
+                           model_path.absolute())
+            retrain = True
+            logger.trace("Possibly retrain it...")
+
+        model_path_fn = model_path
+    else:
+        logger.info("No model already trained... have to train it!")
+        retrain = True
+        model_path_fn = preferred_model
+
+    tokenizer: PreTrainedTokenizer = AutoTokenizer.from_pretrained(preferred_model)
+
+    if retrain:
+        if corpus_data is None:
+            logger.warning("We're planning to fine-tune \"{}\", but you're giving no training data", preferred_model)
+        else:
+            logger.info("Having {} samples in total for fine-tine, eval and test the model", len(corpus_data))
+    else:
+        corpus_data = None
+
+    return IssueSpecificFrameClassifier(model=model_path_fn, tokenizer=tokenizer, train_pairs=corpus_data, **kwargs)
+
+
+@Metric.register(name="IssueSpecificFrameScore", exist_ok=True)
+class IssueSpecificFrameScore(ReferenceFreeMetric):
+    def __init__(self, frame_classifier: IssueSpecificFrameClassifier, fixed_0_1_interval: bool = True):
+        super(IssueSpecificFrameScore, self).__init__()
+
+        self.frame_classifier = frame_classifier
+        self.fixed_0_1_interval = fixed_0_1_interval
+        self.include_premise = True
+        self.premise_col = "input"
+
+        logger.success("Initialized the issue-specific-frame-scorer: {}", frame_classifier)
+        logger.debug("--> classifier type: {}", type(self.frame_classifier.model))
+
+    def score_multi_all(self, summaries_list: List[List[SummaryType]], **kwargs) -> List[List[MetricsDict]]:
+        metrics_lists = []
+        for summaries in summaries_list:
+            metrics_list = []
+            for summary in summaries:
+                logger.trace("Input consists of two parts: premise: \"{}\" --> conclusion: \"{}\"", summary[0],
+                             summary[1])
+                expected_frame = retrieve_issue_specific_frame(premise=summary[0], default="neutral")
+                if expected_frame == "neutral":
+                    logger.warning("It seems to be that \"{}\" doesn't contain a issue-specific-frame -- "
+                                   "its only \"{}\"", summary[0], expected_frame)
+                predicted_frame_score = self.frame_classifier.predict(sample=(summary[1], expected_frame))
+                try:
+                    predicted_frame_score: float = \
+                        predicted_frame_score.item() if isinstance(predicted_frame_score, torch.Tensor) \
+                            else predicted_frame_score
+                except ValueError:
+                    logger.opt(exception=True).error("The Frame-Classifier \"{}\" seems to be misconfigured, "
+                                                     "can't process {}",
+                                                     self.frame_classifier, predicted_frame_score)
+                    predicted_frame_score: float = .5
+                logger.trace("\"{}\"={}=\"{}\"", summary[1], predicted_frame_score, expected_frame)
+
+                if predicted_frame_score < 0 or predicted_frame_score > 1:
+                    if self.fixed_0_1_interval:
+                        logger.debug("The predicted matching score is not in [0,1], but is {}. "
+                                     "We'll force it into the interval", predicted_frame_score)
+                        predicted_frame_score = max(0., min(1., predicted_frame_score))
+                    else:
+                        logger.info("The predicted matching score is not in [0,1], but is {}. "
+                                    "We'll not correct this since {} is configured to tolerate this",
+                                    predicted_frame_score, self)
+
+                metrics_list.append(MetricsDict({
+                        "issuespecific_framescore": predicted_frame_score
+                    }))
             metrics_lists.append(metrics_list)
         return metrics_lists

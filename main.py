@@ -17,7 +17,8 @@ from Evaluation.Evaluate import score_matrix
 from Evaluation.Scores.GRUENscore import GRUENMetric
 from Evaluation.Scores.Rougescore import RougeMetric
 from Evaluation.Scores.SurfaceScore import LengthScore, ClaimLikeScore
-from Evaluation.Scores.FrameIdentifier import FrameScore, get_generic_frame_classifier
+from Evaluation.Scores.FrameIdentifier import GenericFrameScore, get_generic_frame_classifier, IssueSpecificFrameScore, \
+    get_issue_specific_frame_classifier
 from Evaluation.Scores.StanceRelationScore import StanceScore
 from Frames import FrameSet
 from Transformer import FrameBiasedT5ForConditionalGeneration
@@ -111,32 +112,23 @@ def make_topic_distinct(split_1: pandas.DataFrame, split_2: pandas.DataFrame) ->
 
 
 def convert_samples_to_input_str(split: pandas.DataFrame) -> List[Tuple[str, str, int]]:
-    def control_code(row) -> str:
-        ret = " "
+    def control_code(row) -> Tuple[str, int]:
+        ret_control_code = " "
+        ret_generic_frame_id = 0
         if include_topic:
-            ret += "{} {} {} ".format(
+            ret_control_code += "{} {} {} ".format(
                 const.TOPIC_START_TOKEN,
                 row["topic"],
                 const.TOPIC_END_TOKEN
             )
         if include_issue_specific_frame:
-            ret += "{} {} {} ".format(
+            ret_control_code += "{} {} {} ".format(
                 const.ISSUE_SPECIFIC_FRAME_START_TOKEN,
-                row["frame"],
+                row["issue_specific_frame"]
+                if "issue_specific_frame" in split.columns and pandas.notna(row["issue_specific_frame"])
+                else row["frame"],
                 const.ISSUE_SPECIFIC_FRAME_END_TOKEN
             )
-        if include_generic_mapped_frame:
-            if cluster_frame is None:
-                logger.warning("You want to include the mapped generic frame, but you didn't define a frame set! "
-                               "Hint: define \"frame_set\"")
-            else:
-                ret += "{} {} {} ".format(
-                    const.GENERIC_MAPPED_FRAME_START_TOKEN,
-                    cluster_frame.issues_specific_frame_to_generic(
-                        issue_specific_frame=row["frame"], topic=row["topic"] if include_topic else None
-                    ),
-                    const.GENERIC_MAPPED_FRAME_END_TOKEN
-                )
         if include_generic_inferred_frame:
             if cluster_frame is None:
                 logger.warning("You want to include the inferred generic frame, but you didn't define a frame set! "
@@ -146,11 +138,11 @@ def convert_samples_to_input_str(split: pandas.DataFrame) -> List[Tuple[str, str
                                "Hint: define \"preferred_model_for_frame_identifier\"")
             else:
                 try:
-                    ret += "{} {} {} ".format(
+                    ret_generic_frame_id = \
+                        torch.argmax(generic_frame_classifier_model.predict(sample=row["conclusion"]), dim=-1).item()
+                    ret_control_code += "{} {} {} ".format(
                         const.GENERIC_INFERRED_FRAME_START_TOKEN,
-                        cluster_frame.data.iloc[
-                            torch.argmax(generic_frame_classifier_model.predict(sample=row["conclusion"]), dim=-1).item()
-                        ]["keywords_label"],
+                        cluster_frame.data.iloc[ret_generic_frame_id]["keywords_label"],
                         const.GENERIC_INFERRED_FRAME_END_TOKEN
                     )
                 except ValueError:
@@ -161,13 +153,24 @@ def convert_samples_to_input_str(split: pandas.DataFrame) -> List[Tuple[str, str
                 except KeyError:
                     logger.opt(exception=True).error("Your frame set us malformed - no \"keywords_label\" ({})",
                                                      cluster_frame)
-        return ret.rstrip()
-    return [("summarize{}: {}".format(control_code(row), str(row["premise"]).strip(" \"'")), row["conclusion"],
-             0 if cluster_frame is None else
-             cluster_frame.issues_specific_frame_to_generic(
-                 issue_specific_frame=row["frame"], fetch_column=None, topic=row["topic"] if include_topic else None
-             ))
-            for _, row in split.iterrows()]
+        if include_generic_mapped_frame:
+            if cluster_frame is None:
+                logger.warning("You want to include the mapped generic frame, but you didn't define a frame set! "
+                               "Hint: define \"frame_set\"")
+            else:
+                ret_control_code += "{} {} {} ".format(
+                    const.GENERIC_MAPPED_FRAME_START_TOKEN,
+                    cluster_frame.issues_specific_frame_to_generic(
+                        issue_specific_frame=row["frame"], topic=row["topic"] if include_topic else None
+                    ),
+                    const.GENERIC_MAPPED_FRAME_END_TOKEN
+                )
+                ret_generic_frame_id = cluster_frame.issues_specific_frame_to_generic(
+                    issue_specific_frame=row["frame"], fetch_column=None, topic=row["topic"] if include_topic else None
+                )
+        return ret_control_code.rstrip(), ret_generic_frame_id
+    return [("summarize{}: {}".format(c_out[0], str(row["premise"]).strip(" \"'")), row["conclusion"], c_out[1])
+            for _, row in split.iterrows() if (c_out := control_code(row)) is not None]
 
 
 def convert_input_str_to_input_int(split: List[Tuple[str, str]], fn_tokenizer: transformers.PreTrainedTokenizer,
@@ -241,11 +244,11 @@ if __name__ == '__main__':
 
     len_stump_df = len(df) - last_df_size
 
-    train = df[:len_stump_df+int(.8*last_df_size)]
-    val = df[int(len_stump_df+.8*last_df_size):int(len_stump_df+.9*last_df_size)]
+    train: pandas.DataFrame = df[:len_stump_df+int(.8*last_df_size)]
+    val: pandas.DataFrame = df[int(len_stump_df+.8*last_df_size):int(len_stump_df+.9*last_df_size)]
     if train_val_test_topic_distinct:
         val = make_topic_distinct(train, val)
-    test = df[len_stump_df+int(.9*last_df_size):]
+    test: pandas.DataFrame = df[len_stump_df+int(.9*last_df_size):]
     if train_val_test_topic_distinct:
         test = make_topic_distinct(val, test)
 
@@ -355,6 +358,8 @@ if __name__ == '__main__':
             try:
                 def apply_frame(series: pandas.Series, frame_id, frame) -> pandas.Series:
                     s = series.copy(deep=True)
+                    s["issue_specific_frame_id"] = s["frame_id"]
+                    s["issue_specific_frame"] = s["frame"]
                     s["frame_id"] = frame_id
                     s["frame"] = frame
                     return s
@@ -367,7 +372,7 @@ if __name__ == '__main__':
                         data=[apply_frame(series=data, frame_id=frame_id, frame=frame["label"])
                               for frame_id, frame in alternating_frame_set.data.iterrows()],
                         index=["{}_{}".format(row_id, i) for i in range(len(alternating_frame_set))],
-                        columns=test.columns),
+                        columns=list(test.columns) + ["issue_specific_frame_id", "issue_specific_frame"]),
                     ignore_index=False, verify_integrity=True
                 )
             except ValueError:
@@ -479,7 +484,7 @@ if __name__ == '__main__':
     ]
     if cluster_frame is not None and generic_frame_classifier_model is not None:
         metrics_list.append(
-            FrameScore(
+            GenericFrameScore(
                 frame_set=cluster_frame,
                 frame_classifier=generic_frame_classifier_model
             )
@@ -488,6 +493,23 @@ if __name__ == '__main__':
     elif cluster_frame is not None:
         logger.warning("You use a generic frame cluster ({}), but you want not to check the frame evaluation scores!",
                        cluster_frame.name)
+    if include_issue_specific_frame and preferred_model_for_frame_identifier is not None:
+        try:
+            corpus_data = \
+                [(row["conclusion"],
+                  row["issue_specific_frame"]
+                  if "issue_specific_frame" in row and pandas.notna(row["issue_specific_frame"])
+                  else row["frame"])
+                 for _, row in train.iterrows()]
+        except KeyError:
+            logger.opt(exception=True).warning("Can't extract training data for the issue-specific-frame-regressor")
+            corpus_data = None
+        metrics_list.append(IssueSpecificFrameScore(
+            frame_classifier=get_issue_specific_frame_classifier(
+                preferred_model=preferred_model_for_frame_identifier,
+                corpus_data=corpus_data
+            )
+        ))
     if preferred_model_for_stance_identifier is not None:
         metrics_list.append(
             StanceScore(
