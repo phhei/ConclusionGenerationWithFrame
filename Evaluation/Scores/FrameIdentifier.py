@@ -291,7 +291,7 @@ class IssueSpecificFrameScore(ReferenceFreeMetric):
                                     predicted_frame_score, self)
 
                 metrics_list.append(MetricsDict({
-                        "issuespecific_framescore": predicted_frame_score
+                        "frameissuespecificscore": predicted_frame_score
                     }))
             metrics_lists.append(metrics_list)
         return metrics_lists

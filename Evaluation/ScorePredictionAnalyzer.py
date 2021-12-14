@@ -15,10 +15,11 @@ from const import AVAILABLE_SCORES
 
 predictions_scores_csv: Path = Path(
     "..",
-    ".out/pytorch_lightning/FrameBiasedT5ForConditionalGeneration/128-24/smoothing0.1/tdf0.15/media-frames0.5/t5-large-media-frames/predictions_scores.csv"
+    ".out/pytorch_lightning/FrameBiasedT5ForConditionalGeneration/128-24/smoothing0.1/tdf0.4/media-frames0.5/t5-large-media-frames/predictions_scores.csv"
 )
 reference_scores: List[str] = ["rouge1", "rougeL", "bertscore_f1"
-                               , "framescore_score"
+                               #, "frameissuespecificscore"
+                               #, "framescore_score"
                                ]
 exclude_scores: List[str] = ["rouge", "bertscore_precision", "bertscore_recall", "bertscore_f1"
                              #, "framescore_confidence", "framescore_precision", "framescore_score"
@@ -143,7 +144,7 @@ def average_output(f_predictions_scores_csv: Path = predictions_scores_csv,
     logger.success("Finished creating a average-stat with {} stats", len(f_ret))
 
     try:
-        with f_predictions_scores_csv.parent.joinpath(
+        with save_path.joinpath(
                 "{}_avg_stats.txt".format(predictions_scores_csv.stem)
         ).open(mode="w", encoding="utf-8") as avg_writer:
             pprint(
