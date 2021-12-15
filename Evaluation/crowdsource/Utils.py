@@ -130,7 +130,8 @@ def combine_generations(csv: List[Union[Path, str, Tuple[str, Union[Path, str]]]
                      random_conclusions[-1])
     df.insert(loc=0, column="_random_conclusion", value=random_conclusions)
     df.insert(loc=0, column="_specific_frame", value=specific_frames)
-    df.insert(loc=0, column="_generic_frame", value=generic_frames)
+    if generic_frame_col is not None:
+        df.insert(loc=0, column="_generic_frame", value=generic_frames)
     df.insert(loc=0, column="_topic", value=topics)
     logger.success("Extended the dataframe (now {} cols: {})", len(df), df.columns)
 

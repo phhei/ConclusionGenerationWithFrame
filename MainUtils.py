@@ -56,7 +56,7 @@ def retrieve_generic_frame(premise: str, default: str = "other") -> str:
                                          bracket_end=const.GENERIC_INFERRED_FRAME_END_TOKEN)
         if ret is None:
             logger.warning("There is no information about the used generic frame in \"{}\", "
-                           "let's stick to the default \"{}\"", default)
+                           "let's stick to the default \"{}\"", premise, default)
             return default
         else:
             return ret
@@ -133,3 +133,22 @@ def get_glove_w2v_model(path: Optional[Path] = None) -> KeyedVectors:
                        key, len(picked_model.key_to_index), picked_model.vector_size)
 
         return picked_model
+
+
+def clean_premise(premise: str) -> str:
+    logger.trace("OK, you want to remove the control code from the premise: \"{}\"", premise)
+    for tok in [const.ISSUE_SPECIFIC_FRAME_END_TOKEN, const.GENERIC_MAPPED_FRAME_END_TOKEN,
+                const.GENERIC_INFERRED_FRAME_END_TOKEN]:
+        if tok in premise:
+            index = premise.index(tok)
+            logger.trace("Found the frame end token \"{}\" at position {} - cut", tok, index)
+            premise = premise[index + len(tok):]
+    if const.TOPIC_END_TOKEN in premise:
+        index = premise.index(const.TOPIC_END_TOKEN)
+        logger.trace("Found the topic end token \"{}\" at position {} - cut", const.TOPIC_END_TOKEN, index)
+        premise = premise[index + len(const.TOPIC_END_TOKEN):]
+
+    logger.trace("Last cleaning steps...")
+    premise = premise.strip(" :")
+
+    return premise

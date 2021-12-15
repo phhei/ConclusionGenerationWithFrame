@@ -17,8 +17,8 @@ from Evaluation.Evaluate import score_matrix
 from Evaluation.Scores.GRUENscore import GRUENMetric
 from Evaluation.Scores.Rougescore import RougeMetric
 from Evaluation.Scores.SurfaceScore import LengthScore, ClaimLikeScore
-from Evaluation.Scores.FrameIdentifier import GenericFrameScore, get_generic_frame_classifier, IssueSpecificFrameScore, \
-    get_issue_specific_frame_classifier
+from Evaluation.Scores.FrameIdentifier import GenericFrameScore, get_generic_frame_classifier, \
+    IssueSpecificFrameScore, get_issue_specific_frame_classifier
 from Evaluation.Scores.StanceRelationScore import StanceScore
 from Frames import FrameSet
 from Transformer import FrameBiasedT5ForConditionalGeneration
@@ -482,7 +482,8 @@ if __name__ == '__main__':
         LengthScore(include_premise=True, filter_stopwords=True),
         ClaimLikeScore()
     ]
-    if cluster_frame is not None and generic_frame_classifier_model is not None:
+    if (include_generic_inferred_frame or include_generic_mapped_frame) \
+            and cluster_frame is not None and generic_frame_classifier_model is not None:
         metrics_list.append(
             GenericFrameScore(
                 frame_set=cluster_frame,

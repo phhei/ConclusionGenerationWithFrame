@@ -7,7 +7,7 @@ from pathlib import Path
 
 from Evaluation.crowdsource.Utils import combine_generations, translate_generic_frame_readable
 from FrameClassifier import FrameSet
-from const import TOPIC_END_TOKEN
+from MainUtils import clean_premise as optimize_input
 
 os.chdir("../../")
 
@@ -34,20 +34,7 @@ step_size = 3
 frame_set = FrameSet(frame_set="media_frames", add_other=True)
 #frame_set.add_ecology_frame()
 
-
-def optimize_input(f_input: str) -> str:
-    if TOPIC_END_TOKEN in f_input:
-        return f_input[f_input.index(TOPIC_END_TOKEN)+len(TOPIC_END_TOKEN):].lstrip(" :").rstrip()
-
-    if f_input.startswith("summarize:"):
-        return f_input[len("summarize:"):].strip()
-
-    return f_input.strip()
-
-
 if __name__ == "__main__":
-    print(str(Path().absolute()))
-
     same_conclusion_count = dict()
 
     df = combine_generations(csv)
@@ -118,8 +105,8 @@ if __name__ == "__main__":
                     """.format(index, optimize_input(df[column_for_premise][index]), df[combo[0]][index],
                                df[combo[1]][index], i, "__".join(combo),
                                df["_topic"][index],
-                               df["_specific_frame"][index].replace(to_replace="\"", value="&quot;"),
-                               df["_generic_frame"][index].replace(to_replace="\"", value="&quot;"))
+                               df["_specific_frame"][index].replace("\"", "&quot;"),
+                               df["_generic_frame"][index].replace("\"", "&quot;"))
 
                     if (df["_specific_frame"][index] != df["_generic_frame"][index]) and \
                             (not skip_generic_frame_question_when_other or df["_generic_frame"][index] != "other"):
@@ -132,8 +119,8 @@ if __name__ == "__main__":
                         """.format(index, optimize_input(df[column_for_premise][index]), df[combo[0]][index],
                                    df[combo[1]][index], i, "__".join(combo),
                                    df["_topic"][index],
-                                   df["_specific_frame"][index].replace(to_replace="\"", value="&quot;"),
-                                   df["_generic_frame"][index].replace(to_replace="\"", value="&quot;"))
+                                   df["_specific_frame"][index].replace("\"", "&quot;"),
+                                   df["_generic_frame"][index].replace("\"", "&quot;"))
 
                     content += """
                     </div>
