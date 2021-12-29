@@ -1,26 +1,34 @@
-CREATE TABLE CrowdSourceSamples(
-    test_ID int PRIMARY KEY AUTO_INCREMENT,
+CREATE TABLE CrowdSourceArgument(
+    argument_ID VARCHAR(100) PRIMARY KEY,
     topic TINYTEXT NOT NULL,
     premise TEXT NOT NULL,
-    conclusion1ID TINYTEXT NOT NULL,
-    conclusion1 TEXT NOT NULL,
-    conclusion2ID TINYTEXT NOT NULL,
-    conclusion2 TEXT NOT NULL,
-    issuespecificframe TINYTEXT,
-    genericmappedframe TINYTEXT,
-    genericinferredframe TINYTEXT
+    issue_specific_frame TINYTEXT NOT NULL,
+    generic_mapped_frame TINYTEXT NOT NULL,
+    generic_inferred_frame TINYTEXT
+);
+
+CREATE TABLE CrowdSourceConclusion(
+    argument_ID VARCHAR(100) NOT NULL,
+    conclusion_identifier VARCHAR(100) NOT NULL,
+    conclusion_text TEXT NOT NULL,
+    order_number int,
+    round int,
+    PRIMARY KEY (argument_ID, conclusion_identifier),
+    FOREIGN KEY (argument_ID) REFERENCES CrowdSourceArgument(argument_ID) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE CrowdSourceAnswer(
-    a_ID int PRIMARY KEY AUTO_INCREMENT,
+    a_ID int NOT NULL PRIMARY KEY AUTO_INCREMENT,
     annotator_ID int NOT NULL,
-    test_ID int,
+    argument_ID VARCHAR(100) NOT NULL,
+    conclusion_identifier_1 VARCHAR(100) NOT NULL,
+    conclusion_identifier_2 VARCHAR(100),
     timeInS int NOT NULL,
     a_validity int NOT NULL,
     a_novelty int NOT NULL,
-    a_issuespecificframe int,
-    a_genericmappedframe int,
-    a_genericinferredframe int,
+    a_issue_specific_frame int,
+    a_generic_mapped_frame int,
+    a_generic_inferred_frame int,
     a_comment TEXT,
-    FOREIGN KEY (test_ID) REFERENCES CrowdSourceSamples(test_ID) ON UPDATE CASCADE ON DELETE SET NULL
+    FOREIGN KEY (argument_ID, conclusion_identifier_1) REFERENCES CrowdSourceConclusion(argument_ID, conclusion_identifier) ON UPDATE CASCADE ON DELETE CASCADE
 );

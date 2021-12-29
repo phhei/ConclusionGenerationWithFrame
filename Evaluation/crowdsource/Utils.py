@@ -13,7 +13,7 @@ def combine_generations(csv: List[Union[Path, str, Tuple[str, Union[Path, str]]]
     """
     Combines certain generations in a big (comprehensive) Dataframe-table
 
-    :param csv: a list of cherry-picked predictions
+    :param csv: a list of [cherry-picked] predictions
                     <i>(e.g.: cherry_picked_without-rougebertscore_precisionbertscore_recallbertscore_f1.csv)</i>
                     If you want to have an enriched Dataframe, we recommend to use tuples:
                     <tt>(shortcut_string, path), ...</tt>
@@ -70,24 +70,41 @@ def combine_generations(csv: List[Union[Path, str, Tuple[str, Union[Path, str]]]
     random_conclusions = []
 
     input_rows = [c for c in df.columns if "input" in c]
+    input_rows_debug = [c for c in df.columns if "input_debug" in c]
     generic_frame_cols = [
-        c for c in input_rows
+        c for c in input_rows_debug
         if (not any(map(lambda v: isinstance(v, Tuple), csv)) or
             any(map(lambda v: isinstance(v, Tuple) and "generic" in v[0] and c.startswith(v[0]), csv)))
     ]
     if len(generic_frame_cols) == 0:
-        logger.warning("No column contains a cue about the used generic frame - give up...")
-        generic_frame_col = None
+        generic_frame_cols = [
+            c for c in input_rows
+            if (not any(map(lambda v: isinstance(v, Tuple), csv)) or
+                any(map(lambda v: isinstance(v, Tuple) and "generic" in v[0] and c.startswith(v[0]), csv)))
+        ]
+        if len(generic_frame_cols) == 0:
+            logger.warning("No column contains a cue about the used generic frame - give up...")
+            generic_frame_col = None
+        else:
+            generic_frame_col = generic_frame_cols[0]
     else:
         generic_frame_col = generic_frame_cols[0]
     specific_frame_cols = [
-        c for c in input_rows
+        c for c in input_rows_debug
         if (not any(map(lambda v: isinstance(v, Tuple), csv)) or
             any(map(lambda v: isinstance(v, Tuple) and "specific" in v[0] and c.startswith(v[0]), csv)))
     ]
     if len(specific_frame_cols) == 0:
-        logger.warning("No column contains a cue about the used issue specific frame - give up...")
-        specific_frame_col = None
+        specific_frame_cols = [
+            c for c in input_rows
+            if (not any(map(lambda v: isinstance(v, Tuple), csv)) or
+                any(map(lambda v: isinstance(v, Tuple) and "specific" in v[0] and c.startswith(v[0]), csv)))
+        ]
+        if len(specific_frame_cols) == 0:
+            logger.warning("No column contains a cue about the used issue specific frame - give up...")
+            specific_frame_col = None
+        else:
+            specific_frame_col = specific_frame_cols[0]
     else:
         specific_frame_col = specific_frame_cols[0]
     for index, data in df.iterrows():
@@ -96,7 +113,7 @@ def combine_generations(csv: List[Union[Path, str, Tuple[str, Union[Path, str]]]
         if len(input_rows) >= 1:
             for i in range(len(input_rows)):
                 topic = retrieve_topic(premise=data[input_rows[i]])
-                if topic != "not available":
+                if topic != data[input_rows[i]]:
                     logger.trace("Found suitable topic: {}", topic)
                     topics.append(topic)
                     break

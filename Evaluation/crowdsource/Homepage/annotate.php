@@ -143,7 +143,7 @@
             }
     </script>
 </header>
-<body style="text-align: center; max-width: 1000px;">
+<body style="text-align: center; max-width: 1000px; margin: auto;">
     <h1>Sample <?php echo $sample_ID; ?></h1>
     <progress id="progress_annotation" value="<?php echo $samples_done*1000/$samples_total ?>" max="1000"> <?php echo round($samples_done*100/$samples_total) ?>% </progress>
     <h2><?php echo $topic; ?></h2>
@@ -188,7 +188,7 @@
     <hr>
     <div style="display: inline-block; width: 100%;">
         <h2>Instructions</h2>
-        <p>We ask you to rate conclusions in a pair-wise manner in a discussion. To this end, you have for each argument the topic in the title, a premise (the explain- / give-reasons-part of an argument) and two conclusions (two stated claims) (hopefully) matching the premise. But - which conclusion is more appropriate? Which conclusion fits the premise better?</p>
+        <p>We ask you to rate conclusions in a pair-wise manner in a discussion. To this end, you have for each argument the topic in the title, a premise (the explain- / give-reasons-part of an argument) and two conclusions (hopefully) matching the premise. But - which conclusion is more appropriate? Which conclusion fits the premise better?</p>
 
         <p>Premise --&gt; conclusion 1 ? OR Premise --&gt; conclusion 2?</p>
 
@@ -201,16 +201,16 @@
         </ol>
         <h3>Positive and negative examples</h3>
         <h4>Positive (you should do it in such a way)</h4>
-        <img src="../img/AZ/good_example_n.jpg" width="50%">
+        <img src="../img/AZ/positive_example.jpg" width="50%">
         <ul>
-            <li>differentiated voting: although conclusion 2 is the more trivial one (somewhat a rephrased interpretation of the premise), conclusion 1 is more novel and exactly talks about animal rights, hence it receives 2/4 votes</li>
-            <li>you read each text carefully, thinking about it and hence, you noticed conclusion 2 is a little bit clearer about fairness and equality since the farmers are not fairly treated - suites the aspect  &raquo;fairness and equality&laquo;</li>
+            <li>differentiated voting: although conclusion 2 is the more trivial one (somewhat a rephrased interpretation of the premise), conclusion 1 is more novel and a real inference, hence it receives 2/4 votes</li>
+            <li>you read each text carefully, thinking about it and hence, you noticed conclusion 2 is a little bit clearer about research and conclusion 1 captures more a big question of life</li>
         </ul>
         <h4>Negative (no, no, no...)</h4>
-        <img src="../img/AZ/bad_example_n.jpg" width="50%">
+        <img src="../img/AZ/negative_example.jpg" width="50%">
         <ul>
-            <li>lazy voting (here only for conclusion 1) - yes, sometimes one conclusion outperforms the other in <b>all</b> categories, but this is rare</li>
-            <li>maybe you're thinking: "meat isn't cheap at my supermarket" and therefore, you voted for conclusion 1 - however, we don't ask for your personal opinion about the topic, only stick to the premise and the conclusion - and the premise STATES the low prices at meat and so on.</li>
+            <li>lazy voting (here only for conclusion 2 or tie) - yes, sometimes one conclusion outperforms the other in <b>all</b> categories, but this is rare</li>
+            <li>maybe you're thinking: "I'm a atheist, therefore nothing with God!" and therefore, you voted for conclusion 2 - however, we don't ask for your personal opinion about the topic, only stick to the premise and the conclusion - and the premise is a perfect base for conclusion 1.</li>
         </ul>
     </div>
 </body>
