@@ -37,7 +37,7 @@ if($_POST) {
 <body>
     <form action="admin.php" method="post" autocomplete="off">
         Password: <input type="password" name="pw" maxlength="50" required><br>
-        <textarea name="query" wrap="hard" required rows="15" cols="80">SQL-Query</textarea><br>
+        <textarea name="query" wrap="hard" required rows="15" cols="80"><?php echo array_key_exists("query", $_POST) ? $_POST["query"] : "SQL-Query"; ?></textarea><br>
         <button type="submit">Execute</button>
     </form>
     <hr>

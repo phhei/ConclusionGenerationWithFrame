@@ -27,7 +27,7 @@ columns_for_rating = ["bertscore_f1", "rouge1", "rougeL"]
 
 
 def extract_modified_frame(path: str) -> str:
-    folder_name = Path(path).parent.parent.name
+    folder_name = Path(path).parent.parent.parent.name
     if not folder_name.startswith("predictions_scores_"):
         return folder_name
 
@@ -36,6 +36,8 @@ def extract_modified_frame(path: str) -> str:
         folder_name = folder_name.split(sep="_", maxsplit=1)[1]
     if folder_name.endswith("_linear_regression_cherry_picker"):
         folder_name = folder_name[:-len("_linear_regression_cherry_picker")]
+    if folder_name.endswith("_cherry_picker"):
+        folder_name = folder_name[:-len("_cherry_picker")]
 
     return folder_name
 

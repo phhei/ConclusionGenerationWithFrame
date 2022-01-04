@@ -209,32 +209,32 @@
     <form action="annotate-single.php?annotator_ID=<?php echo $_GET["annotator_ID"]; ?>" method="POST" autocomplete="off">
         <h3>Validity: Conclusion is justified based on the premise</h3>
         <ol>
-            <li><input type="radio" value="1" name="validity" required onclick="Validity(1);" title="I agree" <?php if($a_validity === 1) { ?>checked<?php }?>>yes</li>
-            <li><input type="radio" value="0" name="validity" required onclick="Validity(0);" title="0" <?php if($a_validity === 0) { ?>checked<?php }?>>I can't decide (try to avoid this option - only if you're really unsure)</li>
-            <li><input type="radio" value="-1" name="validity" required onclick="Validity(-1);" title="I disagree" <?php if($a_validity === -1) { ?>checked<?php }?>>no</li>
+            <li><input type="radio" value="1" name="validity" required onclick="Validity(1);" title="I agree" <?php if($a_validity === "1") { ?>checked<?php }?>>yes</li>
+            <li><input type="radio" value="0" name="validity" required onclick="Validity(0);" title="0" <?php if($a_validity === "0") { ?>checked<?php }?>>I can't decide (try to avoid this option - only if you're really unsure)</li>
+            <li><input type="radio" value="-1" name="validity" required onclick="Validity(-1);" title="I disagree" <?php if($a_validity === "-1") { ?>checked<?php }?>>no</li>
         </ol>
         <h3>Novelty: Conclusion introduces premise-related novel content (is, e.g., not a paraphrased repetition of (a part of) the premise)</h3>
         <ol>
-            <li><input type="radio" value="1" name="novelty" required onclick="Novelty(1);" title="I agree" <?php if($a_novelty === 1) { ?>checked<?php }?>>yes</li>
-            <li><input type="radio" value="0" name="novelty" required onclick="Novelty(0);" title="0" <?php if($a_novelty === 0) { ?>checked<?php }?>>I can't decide (try to avoid this option - only if you're really unsure)</li>
-            <li><input type="radio" value="-1" name="novelty" required onclick="Novelty(-1);" title="I disagree" <?php if($a_novelty === -1) { ?>checked<?php }?>>no</li>
+            <li><input type="radio" value="1" name="novelty" required onclick="Novelty(1);" title="I agree" <?php if($a_novelty === "1") { ?>checked<?php }?>>yes</li>
+            <li><input type="radio" value="0" name="novelty" required onclick="Novelty(0);" title="0" <?php if($a_novelty === "0") { ?>checked<?php }?>>I can't decide (try to avoid this option - only if you're really unsure)</li>
+            <li><input type="radio" value="-1" name="novelty" required onclick="Novelty(-1);" title="I disagree" <?php if($a_novelty === "-1") { ?>checked<?php }?>>no</li>
         </ol>
         <?php if(!is_null($generic_frame) and $generic_frame !== "NULL") { ?>
         <h3> Generic perspective &raquo;<?php echo $generic_frame; ?>&laquo;</h3>
         The conclusion is directed towards the perspective <abbr title="<?php echo $generic_frame_description; ?>">&raquo;<?php echo $generic_frame; ?>&laquo;</abbr>.
         <ol>
-            <li><input type="radio" value="1" name="generalFraming" required onclick="FrameGen(1);" title="I agree" <?php if($a_generic_mapped_frame === 1) { ?>checked<?php }?>>yes</li>
-            <li><input type="radio" value="0" name="generalFraming" required onclick="FrameGen(0);" title="NONE" <?php if($a_generic_mapped_frame === 0) { ?>checked<?php }?>>I can't decide (try to avoid this option - only if you're really unsure)</li>
-            <li><input type="radio" value="-1" name="generalFraming" required onclick="FrameGen(-1);" title="I disagree" <?php if($a_generic_mapped_frame === -1) { ?>checked<?php }?>>no</li>
+            <li><input type="radio" value="1" name="generalFraming" required onclick="FrameGen(1);" title="I agree" <?php if($a_generic_mapped_frame === "1") { ?>checked<?php }?>>yes</li>
+            <li><input type="radio" value="0" name="generalFraming" required onclick="FrameGen(0);" title="NONE" <?php if($a_generic_mapped_frame === "0") { ?>checked<?php }?>>I can't decide (try to avoid this option - only if you're really unsure)</li>
+            <li><input type="radio" value="-1" name="generalFraming" required onclick="FrameGen(-1);" title="I disagree" <?php if($a_generic_mapped_frame === "-1") { ?>checked<?php }?>>no</li>
         </ol>
         <?php }
         if(!is_null($specific_frame) and $specific_frame !== "NULL") { ?>
         <h3>Specific perspective &raquo;<?php echo $specific_frame; ?>&laquo;</h3>
         The conclusion is directed towards the perspective &raquo;<?php echo $specific_frame; ?>&laquo;.
         <ol>
-            <li><input type="radio" value="1" name="specificFraming" required onclick="FrameSpec(1);" title="I agree" <?php if($a_issue_specific_frame === 1) { ?>checked<?php }?>>yes</li>
-            <li><input type="radio" value="0" name="specificFraming" required onclick="FrameSpec(0);" title="NONE" <?php if($a_issue_specific_frame === 0) { ?>checked<?php }?>>I can't decide (try to avoid this option - only if you're really unsure)</li>
-            <li><input type="radio" value="-1" name="specificFraming" required onclick="FrameSpec(-1);" title="I disagree" <?php if($a_issue_specific_frame === -1) { ?>checked<?php }?>>no</li>
+            <li><input type="radio" value="1" name="specificFraming" required onclick="FrameSpec(1);" title="I agree" <?php if($a_issue_specific_frame === "1") { ?>checked<?php }?>>yes</li>
+            <li><input type="radio" value="0" name="specificFraming" required onclick="FrameSpec(0);" title="NONE" <?php if($a_issue_specific_frame === "0") { ?>checked<?php }?>>I can't decide (try to avoid this option - only if you're really unsure)</li>
+            <li><input type="radio" value="-1" name="specificFraming" required onclick="FrameSpec(-1);" title="I disagree" <?php if($a_issue_specific_frame === "-1") { ?>checked<?php }?>>no</li>
         </ol>
         <?php } ?>
         <textarea cols="80" rows="2" name="comments" maxlength="256" placeholder="Any questions/ comments to this sample? (optional)"></textarea>
