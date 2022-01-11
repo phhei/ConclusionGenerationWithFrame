@@ -25,6 +25,9 @@ reference_scores: List[str] = ["rouge1", "rougeL", "bertscore_f1"
 exclude_scores: List[str] = ["rouge", "bertscore_precision", "bertscore_recall", "bertscore_f1"
                              #, "framescore_confidence", "framescore_precision", "framescore_score"
                              ]
+advanced_x_scores_mapping: List[str] = [
+    #"bertscorePremCon_f1", "bertscorePremCon_precision", "bertscorePremCon_recall"
+]
 advanced_y_scores_mapping: bool = False
 save_path: Path = predictions_scores_csv.parent.joinpath(
     "{}_cherry_picker".format(predictions_scores_csv.stem),
@@ -194,16 +197,18 @@ if __name__ == "__main__":
     logger.success("Read {} samples from \"{}\"", len(df), predictions_scores_csv.name)
     logger.debug("Cols: {}", df.columns)
 
-    Y_cols = [col for col in df.columns if any(map(lambda r: r in col, reference_scores))]
-    logger.info("Found following columns for y-values: {} (input: {})", Y_cols, ", ".join(reference_scores))
-    reference_score_average = {r: sum(map(lambda df_r: df[df_r].mean(skipna=True), r_cols))/len(r_cols)
-                               for r in reference_scores if len(r_cols := [col for col in Y_cols if r in col]) >= 1}
-    logger.info("We have following averages: {}", reference_score_average)
     X_cols = [
         col for col in df.columns
         if any(map(lambda r: r in col, AVAILABLE_SCORES)) and not any(map(lambda r: r in col, exclude_scores))
     ]
     logger.info("Found following columns for x-values: {} (ignore: {})", X_cols, ", ".join(exclude_scores))
+    Y_cols = [col for col in df.columns if any(map(lambda r: r in col, reference_scores))]
+    logger.info("Found following columns for y-values: {} (input: {})", Y_cols, ", ".join(reference_scores))
+    reference_score_average = {r: sum(map(lambda df_r: df[df_r].mean(skipna=True), r_cols))/len(r_cols)
+                               for r in reference_scores + advanced_x_scores_mapping
+                               if ((len(r_cols := [col for col in Y_cols if r in col]) >= 1) if r in reference_scores
+                                   else len(r_cols := [col for col in X_cols if r in col]) >= 1)}
+    logger.info("We have following averages: {}", reference_score_average)
 
     XY_cols_groups = []
 
@@ -250,9 +255,15 @@ if __name__ == "__main__":
         logger.debug("Let's iterate over the row \"{}\"", i)
         for X_current_cols, Y_current_cols in XY_cols_groups:
             try:
-                X.append([float(row[x]) for x in X_current_cols])
+                def map_x_feature(f_col: str, score: float) -> float:
+                    if any(map(lambda advanced_x: advanced_x in f_col, advanced_x_scores_mapping)):
+                        return (score - sum([v for k, v in reference_score_average.items() if k in f_col]))**2
 
-                def map_y_score(f_scores: Iterable[Tuple[str, float]],
+                    return score
+
+                X.append([map_x_feature(x, float(row[x])) for x in X_current_cols])
+
+                def map_y_label(f_scores: Iterable[Tuple[str, float]],
                                 normal_mode=not advanced_y_scores_mapping) -> float:
                     if normal_mode:
                         return sum(map(lambda f: f[1], f_scores))/len(f_scores)
@@ -267,7 +278,7 @@ if __name__ == "__main__":
                             r_sum -= add_value
                     return r_sum/len(f_scores)
 
-                Y.append(map_y_score([(y, float(row[y])) for y in Y_current_cols]))
+                Y.append(map_y_label([(y, float(row[y])) for y in Y_current_cols]))
                 logger.trace("Appended {} -> {}", X[-1], Y[-1])
                 if Y[-1] >= .95:
                     logger.info("Sample \"{}\" is a proper sample :) [\"{}\" <-> \"{}\"]",

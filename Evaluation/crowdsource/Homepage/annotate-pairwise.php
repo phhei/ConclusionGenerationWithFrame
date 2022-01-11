@@ -1,7 +1,7 @@
 <?php
     require "password.php";
 
-    $annotation_round = "(1)";
+    $annotation_round = "(11, 12)";
 
     if($_POST and array_key_exists("annotator_ID", $_GET)) {
         $conn_db = new mysqli("localhost", "philipp", $db_password, "philipp_umfrage");
@@ -95,8 +95,8 @@
         
         $samples_done = $conn_db->query(
             "SELECT COUNT(*) FROM 
-            (CrowdSourceArgument NATURAL JOIN CrowdSourceConclusion AS C1) JOIN CrowdSourceConclusion AS C2 ON C1.argument_ID = C2.argument_ID and C1.round = C2.round and C1.conclusion_identifier <> C2.conclusion_identifier
-            WHERE EXISTS(SELECT * FROM CrowdSourceAnswer WHERE CrowdSourceAnswer.argument_ID = CrowdSourceArgument.argument_ID and ((conclusion_identifier_1 = C1.conclusion_identifier and conclusion_identifier_2 = C2.conclusion_identifier) or (conclusion_identifier_1 = C1.conclusion_identifier and conclusion_identifier_2 = C2.conclusion_identifier))  and annotator_ID = ". $annotator_ID .") and C1.round IN ". $annotation_round .";"
+            (CrowdSourceArgument NATURAL JOIN CrowdSourceConclusion AS C1) JOIN CrowdSourceConclusion AS C2 ON C1.argument_ID = C2.argument_ID and C1.round = C2.round and C1.conclusion_identifier < C2.conclusion_identifier
+            WHERE EXISTS(SELECT * FROM CrowdSourceAnswer WHERE CrowdSourceAnswer.argument_ID = CrowdSourceArgument.argument_ID and ((conclusion_identifier_1 = C1.conclusion_identifier and conclusion_identifier_2 = C2.conclusion_identifier) or (conclusion_identifier_1 = C2.conclusion_identifier and conclusion_identifier_2 = C1.conclusion_identifier))  and annotator_ID = ". $annotator_ID .") and C1.round IN ". $annotation_round .";"
             )->fetch_array(MYSQLI_NUM);
         $samples_done = $samples_done === FALSE ? 0 : (is_null($samples_done) ? 1 : $samples_done[0]);
         $samples_total = $conn_db->query(
@@ -109,8 +109,8 @@
 	    $result = $conn_db -> query(
             "SELECT CrowdSourceArgument.argument_ID, topic, premise,  C1.conclusion_identifier AS conclusion1_id, C1.conclusion_text AS conclusion1, C2.conclusion_identifier AS conclusion2_id, C2.conclusion_text AS conclusion2, issue_specific_frame, generic_mapped_frame, generic_inferred_frame FROM 
             (CrowdSourceArgument NATURAL JOIN CrowdSourceConclusion AS C1) JOIN CrowdSourceConclusion AS C2 ON C1.argument_ID = C2.argument_ID and C1.round = C2.round and C1.conclusion_identifier <> C2.conclusion_identifier
-            WHERE NOT EXISTS(SELECT * FROM CrowdSourceAnswer WHERE CrowdSourceAnswer.argument_ID = CrowdSourceArgument.argument_ID and ((conclusion_identifier_1 = C1.conclusion_identifier and conclusion_identifier_2 = C2.conclusion_identifier) or (conclusion_identifier_1 = C1.conclusion_identifier and conclusion_identifier_2 = C2.conclusion_identifier))  and annotator_ID = ". $annotator_ID .") and C1.round IN ". $annotation_round ." 
-            ORDER BY C1.order_number, C2.order_number LIMIT 1;"
+            WHERE NOT EXISTS(SELECT * FROM CrowdSourceAnswer WHERE CrowdSourceAnswer.argument_ID = CrowdSourceArgument.argument_ID and ((conclusion_identifier_1 = C1.conclusion_identifier and conclusion_identifier_2 = C2.conclusion_identifier) or (conclusion_identifier_1 = C2.conclusion_identifier and conclusion_identifier_2 = C1.conclusion_identifier))  and annotator_ID = ". $annotator_ID .") and C1.round IN ". $annotation_round ." 
+            ORDER BY CrowdSourceArgument.argument_ID,C1.order_number, C2.order_number LIMIT 1;"
         );
         
         if ($result === FALSE or $result->num_rows == 0) {
@@ -229,14 +229,14 @@
             function Validity(l, v="compare") {
                 if (v == "compare") {
                     if (l == 'left') {
-                        document.getElementById('left').style.backgroundColor = "#90EE90";
-                        document.getElementById('right').style.backgroundColor = "yellow";
+                        document.getElementById("left").style.backgroundColor = "#90EE90";
+                        document.getElementById("right").style.backgroundColor = "yellow";
                     } else if (l == 'right') {
-                        document.getElementById('right').style.backgroundColor = "#90EE90";
-                        document.getElementById('left').style.backgroundColor = "yellow";
+                        document.getElementById("right").style.backgroundColor = "#90EE90";
+                        document.getElementById("left").style.backgroundColor = "yellow";
                     } else {
-                        document.getElementById('left').style.backgroundColor = "yellow";
-                        document.getElementById('right').style.backgroundColor = "yellow";
+                        document.getElementById("left").style.backgroundColor = "yellow";
+                        document.getElementById("right").style.backgroundColor = "yellow";
                     }
                 } else if (v == 1) {
                     document.getElementById(l).style.color = "DarkGreen";
@@ -245,19 +245,27 @@
                 } else {
                     document.getElementById(l).style.color = "DarkRed";
                 }
+
+                if (document.getElementById("c1_validity_1").checked && document.getElementById("c2_validity_-1").checked) {
+                    document.getElementById("c2c_validity_-1").checked = true;
+                    Validity("left", "compare")
+                } else if (document.getElementById("c2_validity_1").checked && document.getElementById("c1_validity_-1").checked) {
+                    document.getElementById("c2c_validity_1").checked = true;
+                    Validity("right", "compare")
+                }
             }
 
             function  Novelty(l, v="compare") {
                 if (v == "compare") {
                     if (l == 'left') {
-                        document.getElementById('left').style.fontWeight = "bold";
-                        document.getElementById('right').style.fontWeight = "normal";
+                        document.getElementById("left").style.fontWeight = "bold";
+                        document.getElementById("right").style.fontWeight = "normal";
                     } else if(l == 'right') {
-                        document.getElementById('right').style.fontWeight = "bold";
-                        document.getElementById('left').style.fontWeight = "normal";
+                        document.getElementById("right").style.fontWeight = "bold";
+                        document.getElementById("left").style.fontWeight = "normal";
                     } else {
-                        document.getElementById('left').style.fontWeight = "normal";
-                        document.getElementById('right').style.fontWeight = "normal";
+                        document.getElementById("left").style.fontWeight = "normal";
+                        document.getElementById("right").style.fontWeight = "normal";
                     }
                 } else if (v == 1) {
                     document.getElementById(l).style.textDecoration = "underline gray";
@@ -266,19 +274,27 @@
                 } else {
                     document.getElementById(l).style.textDecoration = "line-through";
                 }
+
+                if (document.getElementById("c1_novelty_1").checked && document.getElementById("c2_novelty_-1").checked) {
+                    document.getElementById("c2c_novelty_-1").checked = true;
+                    Novelty("left", "compare")
+                } else if (document.getElementById("c2_novelty_1").checked && document.getElementById("c1_novelty_-1").checked) {
+                    document.getElementById("c2c_novelty_1").checked = true;
+                    Novelty("right", "compare")
+                }
             }
 
             function  FrameSpec(l, v="compare") {
                 if (v == "compare") {
                     if (l == 'left') {
-                        document.getElementById('left').style.borderWidth = "3px";
-                        document.getElementById('right').style.borderWidth = "1px";
+                        document.getElementById("left").style.borderWidth = "3px";
+                        document.getElementById("right").style.borderWidth = "1px";
                     } else if(l == 'right') {
-                        document.getElementById('right').style.borderWidth = "3px";
-                        document.getElementById('left').style.borderWidth = "1px";
+                        document.getElementById("right").style.borderWidth = "3px";
+                        document.getElementById("left").style.borderWidth = "1px";
                     } else {
-                        document.getElementById('left').style.borderWidth = "1px";
-                        document.getElementById('right').style.borderWidth = "1px";
+                        document.getElementById("left").style.borderWidth = "1px";
+                        document.getElementById("right").style.borderWidth = "1px";
                     }
                 } else if (v == 1) {
                     document.getElementById(l).style.borderBottomColor = "DarkGreen";
@@ -287,19 +303,27 @@
                 } else {
                     document.getElementById(l).style.borderBottomColor = "DarkRed";
                 }
+
+                if (document.getElementById("c1_specificFraming_1").checked && document.getElementById("c2_specificFraming_-1").checked) {
+                    document.getElementById("c2c_specificFraming_-1").checked = true;
+                    FrameSpec("left", "compare")
+                } else if (document.getElementById("c2_specificFraming_1").checked && document.getElementById("c1_specificFraming_-1").checked) {
+                    document.getElementById("c2c_specificFraming_1").checked = true;
+                    FrameSpec("right", "compare")
+                }
             }
 
             function  FrameGen(l, v="compare") {
                 if (v == "compare") {
                     if (l == 'left') {
-                        document.getElementById('left').style.borderStyle = "solid";
-                        document.getElementById('right').style.borderStyle = "dashed";
+                        document.getElementById("left").style.borderStyle = "solid";
+                        document.getElementById("right").style.borderStyle = "dashed";
                     } else if(l == 'right') {
-                        document.getElementById('right').style.borderStyle = "solid";
-                        document.getElementById('left').style.borderStyle = "dashed";
+                        document.getElementById("right").style.borderStyle = "solid";
+                        document.getElementById("left").style.borderStyle = "dashed";
                     } else {
-                        document.getElementById('left').style.borderStyle = "dashed";
-                        document.getElementById('right').style.borderStyle = "dashed";
+                        document.getElementById("left").style.borderStyle = "dashed";
+                        document.getElementById("right").style.borderStyle = "dashed";
                     }
                 } else if (v == 1) {
                     document.getElementById(l).style.borderTopColor = "DarkGreen";
@@ -307,6 +331,14 @@
                     document.getElementById(l).style.borderTopColor = "gray";
                 } else {
                     document.getElementById(l).style.borderTopColor = "DarkRed";
+                }
+
+                if (document.getElementById("c1_generalFraming_1").checked && document.getElementById("c2_generalFraming_-1").checked) {
+                    document.getElementById("c2c_generalFraming_-1").checked = true;
+                    FrameGen("left", "compare")
+                } else if (document.getElementById("c2_generalFraming_1").checked && document.getElementById("c1_generalFraming_-1").checked) {
+                    document.getElementById("c2c_generalFraming_1").checked = true;
+                    FrameGen("right", "compare")
                 }
             }
     </script>
@@ -348,58 +380,58 @@
         <div id="right" class="column_2" style="background-color: yellow; border: 1px dashed black; border-radius: 20px; padding: 20px; margin-left: 5px;"><b>Conclusion 2:</b> <?php echo $conclusion2; ?></div>
     </div>
     <h2>Let's rate ;)</h2>
-    <form action="annotate.php?annotator_ID=<?php echo $_GET["annotator_ID"]; ?>" method="POST" autocomplete="off">
-        <h3>Validity: Conclusion X is justified based on the premise</h3>
+    <form action="annotate-pairwise.php?annotator_ID=<?php echo $_GET["annotator_ID"]; ?>" method="POST" autocomplete="off">
+        <h3>Validity: Conclusion is justified based on the premise</h3>
         <div class="row">
             <div class="column_3">
                 <h4>Conclusion 1</h4>
                 <ol>
-                    <li><input type="radio" value="1" name="c1_validity" required onclick="Validity('left', 1);" title="I agree" <?php if($a_c1_validity === "1") { ?>checked<?php }?>>yes</li>
-                    <li><input type="radio" value="0" name="c1_validity" required onclick="Validity('left', 0);" title="0" <?php if($a_c1_validity === "0") { ?>checked<?php }?>>I can't decide</li>
-                    <li><input type="radio" value="-1" name="c1_validity" required onclick="Validity('left', -1);" title="I disagree" <?php if($a_c1_validity === "-1") { ?>checked<?php }?>>no</li>
+                    <li><input type="radio" value="1" name="c1_validity" id="c1_validity_1" required onclick="Validity('left', 1);" title="I agree" <?php if($a_c1_validity === "1") { ?>checked<?php }?>>yes</li>
+                    <li><input type="radio" value="0" name="c1_validity" id="c1_validity_0" required onclick="Validity('left', 0);" title="0" <?php if($a_c1_validity === "0") { ?>checked<?php }?>>I can't decide</li>
+                    <li><input type="radio" value="-1" name="c1_validity" id="c1_validity_-1" required onclick="Validity('left', -1);" title="I disagree" <?php if($a_c1_validity === "-1") { ?>checked<?php }?>>no</li>
                 </ol>
             </div>
             <div class="column_3">
                 <h4>Conclusion 1 vs. Conclusion 2</h4>
                 <ol>
-                    <li><input type="radio" value="-1" name="c2c_validity" required onclick="Validity('left');" title="Conclusion 1" <?php if($a_c1_validity === "1" && $a_c2_validity === "-1") { ?>checked<?php }?>>Conclusion 1 is more appropriate</li>
-                    <li><input type="radio" value="0" name="c2c_validity" required onclick="Validity('none');" title="NONE">Both are equally bad/ good</li>
-                    <li><input type="radio" value="1" name="c2c_validity" required onclick="Validity('right');" title="Conclusion 2" <?php if($a_c1_validity === "-1" && $a_c2_validity === "1") { ?>checked<?php }?>>Conclusion 2 is more appropriate</li>
+                    <li><input type="radio" value="-1" name="c2c_validity" id="c2c_validity_-1" required onclick="Validity('left');" title="Conclusion 1" <?php if($a_c1_validity === "1" && $a_c2_validity === "-1") { ?>checked<?php }?>>Conclusion 1 is more appropriate</li>
+                    <li><input type="radio" value="0" name="c2c_validity" id="c2c_validity_-0" required onclick="Validity('none');" title="NONE">Both are equally bad/ good</li>
+                    <li><input type="radio" value="1" name="c2c_validity" id="c2c_validity_1" required onclick="Validity('right');" title="Conclusion 2" <?php if($a_c1_validity === "-1" && $a_c2_validity === "1") { ?>checked<?php }?>>Conclusion 2 is more appropriate</li>
                 </ol>
             </div>
             <div class="column_3">
                 <h4>Conclusion 2</h4>
                 <ol>
-                    <li><input type="radio" value="1" name="c2_validity" required onclick="Validity('right', 1);" title="I agree" <?php if($a_c2_validity === "1") { ?>checked<?php }?>>yes</li>
-                    <li><input type="radio" value="0" name="c2_validity" required onclick="Validity('right', 0);" title="0" <?php if($a_c2_validity === "0") { ?>checked<?php }?>>I can't decide</li>
-                    <li><input type="radio" value="-1" name="c2_validity" required onclick="Validity('right', -1);" title="I disagree" <?php if($a_c2_validity === "-1") { ?>checked<?php }?>>no</li>
+                    <li><input type="radio" value="1" name="c2_validity" id="c2_validity_1" required onclick="Validity('right', 1);" title="I agree" <?php if($a_c2_validity === "1") { ?>checked<?php }?>>yes</li>
+                    <li><input type="radio" value="0" name="c2_validity" id="c2_validity_0" required onclick="Validity('right', 0);" title="0" <?php if($a_c2_validity === "0") { ?>checked<?php }?>>I can't decide</li>
+                    <li><input type="radio" value="-1" name="c2_validity" id="c2_validity_-1" required onclick="Validity('right', -1);" title="I disagree" <?php if($a_c2_validity === "-1") { ?>checked<?php }?>>no</li>
                 </ol>
             </div>
         </div>
-        <h3>Novelty: Conclusion X introduces premise-related novel content (is, e.g., not a paraphrased repetition of (a part of) the premise)</h3>
+        <h3>Novelty: Conclusion introduces premise-related novel content (is, e.g., not a paraphrased repetition of (a part of) the premise)</h3>
         <div class="row">
             <div class="column_3">
                 <h4>Conclusion 1</h4>
                 <ol>
-                    <li><input type="radio" value="1" name="c1_novelty" required onclick="Novelty('left', 1);" title="I agree" <?php if($a_c1_novelty === "1") { ?>checked<?php }?>>yes</li>
-                    <li><input type="radio" value="0" name="c1_novelty" required onclick="Novelty('left', 0);" title="0" <?php if($a_c1_novelty === "0") { ?>checked<?php }?>>I can't decide</li>
-                    <li><input type="radio" value="-1" name="c1_novelty" required onclick="Novelty('left', -1);" title="I disagree" <?php if($a_c1_novelty === "-1") { ?>checked<?php }?>>no</li>
+                    <li><input type="radio" value="1" name="c1_novelty" id="c1_novelty_1" required onclick="Novelty('left', 1);" title="I agree" <?php if($a_c1_novelty === "1") { ?>checked<?php }?>>yes</li>
+                    <li><input type="radio" value="0" name="c1_novelty" id="c1_novelty_0" required onclick="Novelty('left', 0);" title="0" <?php if($a_c1_novelty === "0") { ?>checked<?php }?>>I can't decide</li>
+                    <li><input type="radio" value="-1" name="c1_novelty" id="c1_novelty_-1" required onclick="Novelty('left', -1);" title="I disagree" <?php if($a_c1_novelty === "-1") { ?>checked<?php }?>>no</li>
                 </ol>
             </div>
             <div class="column_3">
                 <h4>Conclusion 1 vs. Conclusion 2</h4>
                 <ol>
-                    <li><input type="radio" value="-1" name="c2c_novelty" required onclick="Novelty('left');" title="Conclusion 1" <?php if($a_c1_novelty === "1" && $a_c2_novelty === "-1") { ?>checked<?php }?>>Conclusion 1 contains more novel (proper) content</li>
-                    <li><input type="radio" value="0" name="c2c_novelty" required onclick="Novelty('none');" title="NONE">Both contain the equal amount</li>
-                    <li><input type="radio" value="1" name="c2c_novelty" required onclick="Novelty('right');" title="Conclusion 2" <?php if($a_c1_novelty === "-1" && $a_c2_novelty === "1") { ?>checked<?php }?>>Conclusion 2 contains more novel (proper) content</li>
+                    <li><input type="radio" value="-1" name="c2c_novelty" id="c2c_novelty_-1" required onclick="Novelty('left');" title="Conclusion 1" <?php if($a_c1_novelty === "1" && $a_c2_novelty === "-1") { ?>checked<?php }?>>Conclusion 1 contains more novel (proper) content</li>
+                    <li><input type="radio" value="0" name="c2c_novelty" id="c2c_novelty_0" required onclick="Novelty('none');" title="NONE">Both contain the equal amount</li>
+                    <li><input type="radio" value="1" name="c2c_novelty" id="c2c_novelty_1" required onclick="Novelty('right');" title="Conclusion 2" <?php if($a_c1_novelty === "-1" && $a_c2_novelty === "1") { ?>checked<?php }?>>Conclusion 2 contains more novel (proper) content</li>
                 </ol>
             </div>
             <div class="column_3">
                 <h4>Conclusion 2</h4>
                 <ol>
-                    <li><input type="radio" value="1" name="c2_novelty" required onclick="Novelty('right', 1);" title="I agree" <?php if($a_c2_novelty === "1") { ?>checked<?php }?>>yes</li>
-                    <li><input type="radio" value="0" name="c2_novelty" required onclick="Novelty('right', 0);" title="0" <?php if($a_c2_novelty === "0") { ?>checked<?php }?>>I can't decide</li>
-                    <li><input type="radio" value="-1" name="c2_novelty" required onclick="Novelty('right', -1);" title="I disagree" <?php if($a_c2_novelty === "-1") { ?>checked<?php }?>>no</li>
+                    <li><input type="radio" value="1" name="c2_novelty" id="c2_novelty_1" required onclick="Novelty('right', 1);" title="I agree" <?php if($a_c2_novelty === "1") { ?>checked<?php }?>>yes</li>
+                    <li><input type="radio" value="0" name="c2_novelty" id="c2_novelty_0" required onclick="Novelty('right', 0);" title="0" <?php if($a_c2_novelty === "0") { ?>checked<?php }?>>I can't decide</li>
+                    <li><input type="radio" value="-1" name="c2_novelty" id="c2_novelty_-1" required onclick="Novelty('right', -1);" title="I disagree" <?php if($a_c2_novelty === "-1") { ?>checked<?php }?>>no</li>
                 </ol>
             </div>
         </div>
@@ -410,25 +442,25 @@
             <div class="column_3">
                 <h4>Conclusion 1</h4>
                 <ol>
-                    <li><input type="radio" value="1" name="c1_generalFraming" required onclick="FrameGen('left', 1);" title="I agree" <?php if($a_c1_generic_mapped_frame === "1") { ?>checked<?php }?>>yes</li>
-                    <li><input type="radio" value="0" name="c1_generalFraming" required onclick="FrameGen('left', 0);" title="0" <?php if($a_c1_generic_mapped_frame === "0") { ?>checked<?php }?>>I can't decide</li>
-                    <li><input type="radio" value="-1" name="c1_generalFraming" required onclick="FrameGen('left', -1);" title="I disagree" <?php if($a_c1_generic_mapped_frame === "-1") { ?>checked<?php }?>>no</li>
+                    <li><input type="radio" value="1" name="c1_generalFraming" id="c1_generalFraming_1" required onclick="FrameGen('left', 1);" title="I agree" <?php if($a_c1_generic_mapped_frame === "1") { ?>checked<?php }?>>yes</li>
+                    <li><input type="radio" value="0" name="c1_generalFraming" id="c1_generalFraming_0" required onclick="FrameGen('left', 0);" title="0" <?php if($a_c1_generic_mapped_frame === "0") { ?>checked<?php }?>>I can't decide</li>
+                    <li><input type="radio" value="-1" name="c1_generalFraming" id="c1_generalFraming_-1" required onclick="FrameGen('left', -1);" title="I disagree" <?php if($a_c1_generic_mapped_frame === "-1") { ?>checked<?php }?>>no</li>
                 </ol>
             </div>
             <div class="column_3">
                 <h4>Conclusion 1 vs. Conclusion 2</h4>
                 <ol>
-                    <li><input type="radio" value="-1" name="c2c_generalFraming" required onclick="FrameGen('left');" title="Conclusion 1" <?php if($a_c1_generic_mapped_frame === "1" && $a_c2_generic_mapped_frame === "-1") { ?>checked<?php }?>>Conclusion 1 fits better</li>
-                    <li><input type="radio" value="0" name="c2c_generalFraming" required onclick="FrameGen('none');" title="NONE">Both fit equally bad/ good</li>
-                    <li><input type="radio" value="1" name="c2c_generalFraming" required onclick="FrameGen('right');" title="Conclusion 2" <?php if($a_c1_generic_mapped_frame === "-1" && $a_c2_generic_mapped_frame === "1") { ?>checked<?php }?>>Conclusion 2 fits better</li>
+                    <li><input type="radio" value="-1" name="c2c_generalFraming" id="c2c_generalFraming_-1" required onclick="FrameGen('left');" title="Conclusion 1" <?php if($a_c1_generic_mapped_frame === "1" && $a_c2_generic_mapped_frame === "-1") { ?>checked<?php }?>>Conclusion 1 fits better</li>
+                    <li><input type="radio" value="0" name="c2c_generalFraming" id="c2c_generalFraming_0" required onclick="FrameGen('none');" title="NONE">Both fit equally bad/ good</li>
+                    <li><input type="radio" value="1" name="c2c_generalFraming" id="c2c_generalFraming_1" required onclick="FrameGen('right');" title="Conclusion 2" <?php if($a_c1_generic_mapped_frame === "-1" && $a_c2_generic_mapped_frame === "1") { ?>checked<?php }?>>Conclusion 2 fits better</li>
                 </ol>
             </div>
             <div class="column_3">
                 <h4>Conclusion 2</h4>
                 <ol>
-                    <li><input type="radio" value="1" name="c2_generalFraming" required onclick="FrameGen('right', 1);" title="I agree" <?php if($a_c2_generic_mapped_frame === "1") { ?>checked<?php }?>>yes</li>
-                    <li><input type="radio" value="0" name="c2_generalFraming" required onclick="FrameGen('right', 0);" title="0" <?php if($a_c2_generic_mapped_frame === "0") { ?>checked<?php }?>>I can't decide</li>
-                    <li><input type="radio" value="-1" name="c2_generalFraming" required onclick="FrameGen('right', -1);" title="I disagree" <?php if($a_c2_generic_mapped_frame === "-1") { ?>checked<?php }?>>no</li>
+                    <li><input type="radio" value="1" name="c2_generalFraming" id="c2_generalFraming_1" required onclick="FrameGen('right', 1);" title="I agree" <?php if($a_c2_generic_mapped_frame === "1") { ?>checked<?php }?>>yes</li>
+                    <li><input type="radio" value="0" name="c2_generalFraming" id="c2_generalFraming_0" required onclick="FrameGen('right', 0);" title="0" <?php if($a_c2_generic_mapped_frame === "0") { ?>checked<?php }?>>I can't decide</li>
+                    <li><input type="radio" value="-1" name="c2_generalFraming" id="c2_generalFraming_-1" required onclick="FrameGen('right', -1);" title="I disagree" <?php if($a_c2_generic_mapped_frame === "-1") { ?>checked<?php }?>>no</li>
                 </ol>
             </div>
         </div>
@@ -440,25 +472,25 @@
             <div class="column_3">
                 <h4>Conclusion 1</h4>
                 <ol>
-                    <li><input type="radio" value="1" name="c1_specificFraming" required onclick="FrameSpec('left', 1);" title="I agree" <?php if($a_c1_issue_specific_frame === "1") { ?>checked<?php }?>>yes</li>
-                    <li><input type="radio" value="0" name="c1_specificFraming" required onclick="FrameSpec('left', 0);" title="0" <?php if($a_c1_issue_specific_frame === "0") { ?>checked<?php }?>>I can't decide</li>
-                    <li><input type="radio" value="-1" name="c1_specificFraming" required onclick="FrameSpec('left', -1);" title="I disagree" <?php if($a_c1_issue_specific_frame === "-1") { ?>checked<?php }?>>no</li>
+                    <li><input type="radio" value="1" name="c1_specificFraming" id="c1_specificFraming_1" required onclick="FrameSpec('left', 1);" title="I agree" <?php if($a_c1_issue_specific_frame === "1") { ?>checked<?php }?>>yes</li>
+                    <li><input type="radio" value="0" name="c1_specificFraming" id="c1_specificFraming_0" required onclick="FrameSpec('left', 0);" title="0" <?php if($a_c1_issue_specific_frame === "0") { ?>checked<?php }?>>I can't decide</li>
+                    <li><input type="radio" value="-1" name="c1_specificFraming" id="c1_specificFraming_-1" required onclick="FrameSpec('left', -1);" title="I disagree" <?php if($a_c1_issue_specific_frame === "-1") { ?>checked<?php }?>>no</li>
                 </ol>
             </div>
             <div class="column_3">
                 <h4>Conclusion 1 vs. Conclusion 2</h4>
                 <ol>
-                    <li><input type="radio" value="-1" name="c2c_specificFraming" required onclick="FrameSpec('left');" title="Conclusion 1" <?php if($a_c1_issue_specific_frame === "1" && $a_c2_issue_specific_frame === "-1") { ?>checked<?php }?>>Conclusion 1 fits better</li>
-                    <li><input type="radio" value="0" name="c2c_specificFraming" required onclick="FrameSpec('none');" title="NONE">Both fit equally bad/ good</li>
-                    <li><input type="radio" value="1" name="c2c_specificFraming" required onclick="FrameSpec('right');" title="Conclusion 2" <?php if($a_c1_issue_specific_frame === "-1" && $a_c2_issue_specific_frame === "1") { ?>checked<?php }?>>Conclusion 2 fits better</li>
+                    <li><input type="radio" value="-1" name="c2c_specificFraming" id="c2c_specificFraming_-1" required onclick="FrameSpec('left');" title="Conclusion 1" <?php if($a_c1_issue_specific_frame === "1" && $a_c2_issue_specific_frame === "-1") { ?>checked<?php }?>>Conclusion 1 fits better</li>
+                    <li><input type="radio" value="0" name="c2c_specificFraming" id="c2c_specificFraming_0" required onclick="FrameSpec('none');" title="NONE">Both fit equally bad/ good</li>
+                    <li><input type="radio" value="1" name="c2c_specificFraming" id="c2c_specificFraming_1" required onclick="FrameSpec('right');" title="Conclusion 2" <?php if($a_c1_issue_specific_frame === "-1" && $a_c2_issue_specific_frame === "1") { ?>checked<?php }?>>Conclusion 2 fits better</li>
                 </ol>
             </div>
             <div class="column_3">
                 <h4>Conclusion 2</h4>
                 <ol>
-                    <li><input type="radio" value="1" name="c2_specificFraming" required onclick="FrameSpec('right', 1);" title="I agree" <?php if($a_c2_issue_specific_frame === "1") { ?>checked<?php }?>>yes</li>
-                    <li><input type="radio" value="0" name="c2_specificFraming" required onclick="FrameSpec('right', 0);" title="0" <?php if($a_c2_issue_specific_frame === "0") { ?>checked<?php }?>>I can't decide</li>
-                    <li><input type="radio" value="-1" name="c2_specificFraming" required onclick="FrameSpec('right', -1);" title="I disagree" <?php if($a_c2_issue_specific_frame === "-1") { ?>checked<?php }?>>no</li>
+                    <li><input type="radio" value="1" name="c2_specificFraming" id="c2_specificFraming_1" required onclick="FrameSpec('right', 1);" title="I agree" <?php if($a_c2_issue_specific_frame === "1") { ?>checked<?php }?>>yes</li>
+                    <li><input type="radio" value="0" name="c2_specificFraming" id="c2_specificFraming_0" required onclick="FrameSpec('right', 0);" title="0" <?php if($a_c2_issue_specific_frame === "0") { ?>checked<?php }?>>I can't decide</li>
+                    <li><input type="radio" value="-1" name="c2_specificFraming" id="c2_specificFraming_-1" required onclick="FrameSpec('right', -1);" title="I disagree" <?php if($a_c2_issue_specific_frame === "-1") { ?>checked<?php }?>>no</li>
                 </ol>
             </div>
         </div>
@@ -475,26 +507,26 @@
     <hr>
     <div style="display: inline-block; width: 100%;">
         <h2>Instructions</h2>
-        <p>We ask you to rate conclusions in a pair-wise manner in a discussion. To this end, you have for each argument the topic in the title, a premise (the explain- / give-reasons-part of an argument) and two conclusions (hopefully) matching the premise. But - which conclusion is more appropriate? Which conclusion fits the premise better?</p>
+        <p>We ask you to rate conclusions (in a pair-wise manner) in a discussion. To this end, you have for each argument the topic in the title, a premise (the explain- / give-reasons-part of an argument) and two conclusions (hopefully) matching the premise. However - which one is (more) appropriate? Which conclusion fits the premise better?</p>
 
-        <p>Premise --&gt; conclusion 1 ? OR Premise --&gt; conclusion 2?</p>
+        <p>Premise --&gt; conclusion 1 ? AND/OR Premise --&gt; conclusion 2?</p>
 
         <h4>To have differentiated voting, you have to decide on 3+1 aspects.</h4>
 
         <ol>
-            <li><b>Validity:</b> Which conclusion is more reasonable / more appropriate? So, what is more likely? Conclusion 1 follows given the premise or conclusion 2?</li>
-            <li><b>Novelty:</b> Which conclusion contains more novel information? Copying (or rephrasing) parts of the premise is too easy (should get no vote rather). Here we seek the conclusion with the most novel content, with the most conclusion-information-gain.</li>
-            <li><b>Perspective &raquo;xxx&laquo;:</b> You can argue from different perspectives. For example, if you discuss raising taxes, you can emphasize the side of the tax-payers or the government's side or think about moral viewpoints. All these perspectives are called &raquo;Frames&laquo;. Here, you should rate how much the desired perspective occurs in the conclusions. A conclusion that fits more (obviously) into the desired perspective should gain the vote.</li>
+            <li><b>Validity:</b> Which conclusion is (more) reasonable / (more) appropriate? So, what is (more) likely? Conclusion 1 follows given the premise and/or conclusion 2? <i>Hint: a repetition of the premise would be totally valid, it's a so-called tautology.</i></li>
+            <li><b>Novelty:</b> Which conclusion contains more novel information? <i>(the novel information must be premise-related - a random sentence of another topic probably doesn't contain novel content with respect to the premise.)</i> Just copying (or rephrasing) parts of the premise is too easy (should get no vote rather). Here we seek the conclusion with the most novel content, with the most conclusion-information-gain.</li>
+            <li><b>Perspective &raquo;xxx&laquo;:</b> You can argue from different perspectives. For example, if you discuss raising taxes, you can emphasize the side of the tax-payers or the government's side or think about moral viewpoints. All these perspectives are called &raquo;Frames&laquo;. Here, you should rate how much the desired perspective occurs in the <i>conclusions</i> (without considering the appropriateness to the premise again). A conclusion that fits more (obviously) into the desired perspective should gain the vote.</li>
         </ol>
         <h3>Positive and negative examples</h3>
         <h4>Positive (you should do it in such a way)</h4>
-        <img src="../img/AZ/positive_example.jpg" width="50%">
+        <img src="./img/positive_example-pairwise.jpg" width="50%">
         <ul>
             <li>differentiated voting: although conclusion 2 is the more trivial one (somewhat a rephrased interpretation of the premise), conclusion 1 is more novel and a real inference, hence it receives 2/4 votes</li>
             <li>you read each text carefully, thinking about it and hence, you noticed conclusion 2 is a little bit clearer about research and conclusion 1 captures more a big question of life</li>
         </ul>
         <h4>Negative (no, no, no...)</h4>
-        <img src="../img/AZ/negative_example.jpg" width="50%">
+        <img src="./img/negative_example-pairwise.jpg" width="50%">
         <ul>
             <li>lazy voting (here only for conclusion 2 or tie) - yes, sometimes one conclusion outperforms the other in <b>all</b> categories, but this is rare</li>
             <li>maybe you're thinking: "I'm a atheist, therefore nothing with God!" and therefore, you voted for conclusion 2 - however, we don't ask for your personal opinion about the topic, only stick to the premise and the conclusion - and the premise is a perfect base for conclusion 1.</li>
