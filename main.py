@@ -431,7 +431,7 @@ if __name__ == '__main__':
                                                   (2 * tdf_vocab_smoothing_factor * (tdf_log/max(1, torch.max(tdf_log))))
                 logger.trace("Computed the additional_training_args out of {}: {}", train_x["input_ids"].shape,
                              additional_training_args["tdf"])
-        if frame_vocab_smoothing_factor is not None and additional_training_args is not None:
+        if frame_vocab_smoothing_factor is not None:
             if additional_training_args is None:
                 logger.error("You can't have a proper frame-smoothing (frame_vocab_smoothing_factor: {}) "
                              "when you ignore the label_smoothing in general! Please set a value for label_smoothing",

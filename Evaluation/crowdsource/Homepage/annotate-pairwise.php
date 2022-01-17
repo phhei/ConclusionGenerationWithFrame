@@ -1,7 +1,7 @@
 <?php
     require "password.php";
 
-    $annotation_round = "(11, 12)";
+    $annotation_round = "(21, 22, 23, 24, 25)";
 
     if($_POST and array_key_exists("annotator_ID", $_GET)) {
         $conn_db = new mysqli("localhost", "philipp", $db_password, "philipp_umfrage");
@@ -394,9 +394,9 @@
             <div class="column_3">
                 <h4>Conclusion 1 vs. Conclusion 2</h4>
                 <ol>
-                    <li><input type="radio" value="-1" name="c2c_validity" id="c2c_validity_-1" required onclick="Validity('left');" title="Conclusion 1" <?php if($a_c1_validity === "1" && $a_c2_validity === "-1") { ?>checked<?php }?>>Conclusion 1 is more appropriate</li>
+                    <li><input type="radio" value="-1" name="c2c_validity" id="c2c_validity_-1" required onclick="Validity('left');" title="Conclusion 1" <?php if($a_c1_validity === "1" && $a_c2_validity === "-1") { ?>checked<?php }?>>Conclusion 1 is more valid</li>
                     <li><input type="radio" value="0" name="c2c_validity" id="c2c_validity_-0" required onclick="Validity('none');" title="NONE">Both are equally bad/ good</li>
-                    <li><input type="radio" value="1" name="c2c_validity" id="c2c_validity_1" required onclick="Validity('right');" title="Conclusion 2" <?php if($a_c1_validity === "-1" && $a_c2_validity === "1") { ?>checked<?php }?>>Conclusion 2 is more appropriate</li>
+                    <li><input type="radio" value="1" name="c2c_validity" id="c2c_validity_1" required onclick="Validity('right');" title="Conclusion 2" <?php if($a_c1_validity === "-1" && $a_c2_validity === "1") { ?>checked<?php }?>>Conclusion 2 is more valid</li>
                 </ol>
             </div>
             <div class="column_3">
