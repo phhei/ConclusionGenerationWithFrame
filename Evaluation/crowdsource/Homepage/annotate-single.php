@@ -156,7 +156,8 @@
     $topic = is_null($error_msg) ? $topic : $error_msg;
 ?>
 
-<header>
+<!DOCTYPE html>
+<head>
     <title>You're in annotation mood (<?php echo $_GET["annotator_ID"] ?>)</title>
     <script>
             function Validity(l) {
@@ -199,7 +200,7 @@
                 }
             }
     </script>
-</header>
+</head>
 <body style="text-align: center; max-width: 1000px; margin: auto;">
     <h1>Sample <?php echo $sample_ID; ?></h1>
     <progress id="progress_annotation" value="<?php echo $samples_done*1000/$samples_total ?>" max="1000"> <?php echo round($samples_done*100/$samples_total) ?>% </progress>

@@ -1,7 +1,7 @@
 <?php
     require "password.php";
 
-    $annotation_round = "(21, 22, 23, 24, 25)";
+    $annotation_round = ($_GET and array_key_exists("additional_args", $_GET)) ? "(36, 37, 38)" : "(31, 32, 33, 34, 35)";
 
     if($_POST and array_key_exists("annotator_ID", $_GET)) {
         $conn_db = new mysqli("localhost", "philipp", $db_password, "philipp_umfrage");
@@ -223,7 +223,8 @@
     $topic = is_null($error_msg) ? $topic : $error_msg;
 ?>
 
-<header>
+<!DOCTYPE html>
+<head>
     <title>You're in annotation mood (<?php echo $_GET["annotator_ID"] ?>)</title>
     <script>
             function Validity(l, v="compare") {
@@ -369,10 +370,10 @@
             clear: both;
         }
     </style>
-</header>
+</head>
 <body style="text-align: center; max-width: 1000px; margin: auto;">
     <h1>Sample <?php echo $sample_ID; ?></h1>
-    <progress id="progress_annotation" value="<?php echo $samples_done*1000/$samples_total ?>" max="1000"> <?php echo round($samples_done*100/$samples_total) ?>% </progress>
+    <progress id="progress_annotation" value="<?php echo round($samples_done*1000/$samples_total); ?>" max="1000"> <?php echo $samples_done ." out of ". $samples_total; ?> </progress>
     <h2><?php echo $topic; ?></h2>
     <div style="width: 98%; background-color: lightgray; border: 1px solid black; border-radius: 20px; padding: 10px; margin-top: 12px; margin-bottom: 20px; display: inline-block;"><b>Premise:</b> <?php echo $premise; ?></div>
     <div class="row">
@@ -380,7 +381,7 @@
         <div id="right" class="column_2" style="background-color: yellow; border: 1px dashed black; border-radius: 20px; padding: 20px; margin-left: 5px;"><b>Conclusion 2:</b> <?php echo $conclusion2; ?></div>
     </div>
     <h2>Let's rate ;)</h2>
-    <form action="annotate-pairwise.php?annotator_ID=<?php echo $_GET["annotator_ID"]; ?>" method="POST" autocomplete="off">
+    <form action="<?php echo $_SERVER["REQUEST_URI"]; ?>" method="POST" autocomplete="off">
         <h3>Validity: Conclusion is justified based on the premise</h3>
         <div class="row">
             <div class="column_3">
@@ -395,7 +396,7 @@
                 <h4>Conclusion 1 vs. Conclusion 2</h4>
                 <ol>
                     <li><input type="radio" value="-1" name="c2c_validity" id="c2c_validity_-1" required onclick="Validity('left');" title="Conclusion 1" <?php if($a_c1_validity === "1" && $a_c2_validity === "-1") { ?>checked<?php }?>>Conclusion 1 is more valid</li>
-                    <li><input type="radio" value="0" name="c2c_validity" id="c2c_validity_-0" required onclick="Validity('none');" title="NONE">Both are equally bad/ good</li>
+                    <li><input type="radio" value="0" name="c2c_validity" id="c2c_validity_-0" required onclick="Validity('none');" title="NONE" <?php if($conclusion1 == $conclusion2) { ?>checked<?php }?>>Both are equally bad/ good</li>
                     <li><input type="radio" value="1" name="c2c_validity" id="c2c_validity_1" required onclick="Validity('right');" title="Conclusion 2" <?php if($a_c1_validity === "-1" && $a_c2_validity === "1") { ?>checked<?php }?>>Conclusion 2 is more valid</li>
                 </ol>
             </div>
@@ -422,7 +423,7 @@
                 <h4>Conclusion 1 vs. Conclusion 2</h4>
                 <ol>
                     <li><input type="radio" value="-1" name="c2c_novelty" id="c2c_novelty_-1" required onclick="Novelty('left');" title="Conclusion 1" <?php if($a_c1_novelty === "1" && $a_c2_novelty === "-1") { ?>checked<?php }?>>Conclusion 1 contains more novel (proper) content</li>
-                    <li><input type="radio" value="0" name="c2c_novelty" id="c2c_novelty_0" required onclick="Novelty('none');" title="NONE">Both contain the equal amount</li>
+                    <li><input type="radio" value="0" name="c2c_novelty" id="c2c_novelty_0" required onclick="Novelty('none');" title="NONE" <?php if($conclusion1 == $conclusion2) { ?>checked<?php }?>>Both contain the equal amount</li>
                     <li><input type="radio" value="1" name="c2c_novelty" id="c2c_novelty_1" required onclick="Novelty('right');" title="Conclusion 2" <?php if($a_c1_novelty === "-1" && $a_c2_novelty === "1") { ?>checked<?php }?>>Conclusion 2 contains more novel (proper) content</li>
                 </ol>
             </div>
@@ -451,7 +452,7 @@
                 <h4>Conclusion 1 vs. Conclusion 2</h4>
                 <ol>
                     <li><input type="radio" value="-1" name="c2c_generalFraming" id="c2c_generalFraming_-1" required onclick="FrameGen('left');" title="Conclusion 1" <?php if($a_c1_generic_mapped_frame === "1" && $a_c2_generic_mapped_frame === "-1") { ?>checked<?php }?>>Conclusion 1 fits better</li>
-                    <li><input type="radio" value="0" name="c2c_generalFraming" id="c2c_generalFraming_0" required onclick="FrameGen('none');" title="NONE">Both fit equally bad/ good</li>
+                    <li><input type="radio" value="0" name="c2c_generalFraming" id="c2c_generalFraming_0" required onclick="FrameGen('none');" title="NONE" <?php if($conclusion1 == $conclusion2) { ?>checked<?php }?>>Both fit equally bad/ good</li>
                     <li><input type="radio" value="1" name="c2c_generalFraming" id="c2c_generalFraming_1" required onclick="FrameGen('right');" title="Conclusion 2" <?php if($a_c1_generic_mapped_frame === "-1" && $a_c2_generic_mapped_frame === "1") { ?>checked<?php }?>>Conclusion 2 fits better</li>
                 </ol>
             </div>
@@ -481,7 +482,7 @@
                 <h4>Conclusion 1 vs. Conclusion 2</h4>
                 <ol>
                     <li><input type="radio" value="-1" name="c2c_specificFraming" id="c2c_specificFraming_-1" required onclick="FrameSpec('left');" title="Conclusion 1" <?php if($a_c1_issue_specific_frame === "1" && $a_c2_issue_specific_frame === "-1") { ?>checked<?php }?>>Conclusion 1 fits better</li>
-                    <li><input type="radio" value="0" name="c2c_specificFraming" id="c2c_specificFraming_0" required onclick="FrameSpec('none');" title="NONE">Both fit equally bad/ good</li>
+                    <li><input type="radio" value="0" name="c2c_specificFraming" id="c2c_specificFraming_0" required onclick="FrameSpec('none');" title="NONE" <?php if($conclusion1 == $conclusion2) { ?>checked<?php }?>>Both fit equally bad/ good</li>
                     <li><input type="radio" value="1" name="c2c_specificFraming" id="c2c_specificFraming_1" required onclick="FrameSpec('right');" title="Conclusion 2" <?php if($a_c1_issue_specific_frame === "-1" && $a_c2_issue_specific_frame === "1") { ?>checked<?php }?>>Conclusion 2 fits better</li>
                 </ol>
             </div>

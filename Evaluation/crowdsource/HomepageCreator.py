@@ -35,7 +35,18 @@ skip_other_framed: bool = False
 split_conclusion_batches: Union[bool, int] = True
 skip_generic_frame_question_when_other: bool = True
 skip_equal_matches_number: int = 5
-total_samples: Union[int, List[str]] = 30
+total_samples: Union[int, List[str]] = [
+    "test_1013", "test_1043", "test_1089", "test_1117", "test_1130", "test_1151", "test_1158", "test_1184", "test_1191",
+    "test_1222", "test_635", "test_658", "test_687", "test_743", "test_744", "test_770", "test_775", "test_804",
+    "test_811", "test_832", "test_833", "test_835", "test_861", "test_884", "test_910", "test_915", "test_946",
+    "test_960", "test_978", "test_985"
+]
+total_samples: Union[int, List[str]] = [
+    'test_1012', 'test_1027', 'test_1035', 'test_1068', 'test_1072', 'test_1113', 'test_1137', 'test_1154', 'test_1171',
+    'test_1197', 'test_1203', 'test_1205', 'test_1210', 'test_621', 'test_630', 'test_637', 'test_681', 'test_684',
+    'test_741', 'test_745', 'test_753', 'test_782', 'test_796', 'test_799', 'test_815', 'test_876', 'test_890',
+    'test_911', 'test_930', 'test_942'
+]
 
 frame_set = FrameSet(frame_set="media_frames", add_other=True)
 #frame_set.add_ecology_frame()
