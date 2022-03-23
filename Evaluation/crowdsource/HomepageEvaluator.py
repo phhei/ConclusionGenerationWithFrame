@@ -15,72 +15,138 @@ import matplotlib.pyplot as plt
 logger.remove()
 logger.add(sys.stdout, level="INFO")
 
-csv_sql_copy: Path = Path("../../.out/manual_evaluation/survey/Homepage-1 (smooth)/result.csv")
-    #Path("../../.out/manual_evaluation/survey/Homepage-0 (input-frames)/result.csv")
+csv_sql_copy: Path = Path("../../.out/manual_evaluation/survey/Homepage-2 (cherry-picking)/result.csv")
 relevant_cols = [
     "a_validity",
     "a_novelty",
-    #"a_issue_specific_frame",
-    #"a_generic_mapped_frame"
+    "a_issue_specific_frame",
+    "a_generic_mapped_frame"
 ]
 models_to_analyse: List[str] = [
-    "_random_conclusion",
-    "T5_ground_truth",
-    "T5_best_beam_prediction",
-    "T5+topic_best_beam_prediction",
-    "T5+topic+is_best_beam_prediction",
+    #"_random_conclusion",
+    #"T5_ground_truth",
+    #"T5_best_beam_prediction",
+    #"T5+topic_best_beam_prediction",
+    "T5smooth+topic_best_beam_prediction",
+    "T5cherrysmooth+topic_selected_prediction",
+    #"T5+topic+is_best_beam_prediction",
+    "T5smooth+topic+is_best_beam_prediction",
+    "T5cherrysmooth+topic+is_selected_prediction",
+    "T5cherryfsmooth+topic+is_selected_prediction",
     "T5+topic+gen_best_beam_prediction",
-    "T5+topic+inf_best_beam_prediction",
-    "T5+topic+specific+generic_best_beam_prediction",
-    "T5+topic+specific+inf_best_beam_prediction",
-    "T5+topic+specific+generic+inf_best_beam_prediction"
+    #"T5smooth+topic+gen_best_beam_prediction",
+    "T5cherry+topic+gen_selected_prediction",
+    "T5cherryf+topic+gen_selected_prediction",
+    #"T5+topic+inf_best_beam_prediction",
+    #"T5+topic+specific+generic_best_beam_prediction",
+    "T5smooth+topic+specific+generic_best_beam_prediction",
+    "T5cherrysmooth+topic+specific+generic_selected_prediction",
+    "T5cherryfsmooth+topic+specific+generic_selected_prediction",
+    #"T5+topic+specific+inf_best_beam_prediction",
+    "T5smooth+topic+specific+inf_best_beam_prediction",
+    "T5cherrysmooth+topic+specific+inf_selected_prediction",
+    "T5cherryfsmooth+topic+specific+inf_selected_prediction"#,
+    #"T5+topic+specific+generic+inf_best_beam_prediction"
 ]
 comparative_models_to_analyse: List[Tuple[str, str]] = [
-    ("T5+topic_best_beam_prediction", "T5smooth+topic_best_beam_prediction"),
-    ("T5+topic+gen_best_beam_prediction", "T5smooth+topic+gen_best_beam_prediction"),
-    ("T5+topic+specific+generic_best_beam_prediction", "T5smooth+topic+specific+generic_best_beam_prediction"),
-    ("T5+topic+is_best_beam_prediction", "T5smooth+topic+is_best_beam_prediction"),
-    ("T5+topic+specific+inf_best_beam_prediction", "T5smooth+topic+specific+inf_best_beam_prediction")
+    #("T5+topic_best_beam_prediction", "T5smooth+topic_best_beam_prediction"),
+    #("T5+topic+gen_best_beam_prediction", "T5smooth+topic+gen_best_beam_prediction"),
+    #("T5+topic+specific+generic_best_beam_prediction", "T5smooth+topic+specific+generic_best_beam_prediction"),
+    #("T5+topic+is_best_beam_prediction", "T5smooth+topic+is_best_beam_prediction"),
+    #("T5+topic+specific+inf_best_beam_prediction", "T5smooth+topic+specific+inf_best_beam_prediction"),
+
+    ("T5smooth+topic_best_beam_prediction", "T5cherrysmooth+topic_selected_prediction"),
+    ("T5smooth+topic+is_best_beam_prediction", "T5cherrysmooth+topic+is_selected_prediction"),
+    ("T5smooth+topic+is_best_beam_prediction", "T5cherryfsmooth+topic+is_selected_prediction"),
+    ("T5cherrysmooth+topic+is_selected_prediction", "T5cherryfsmooth+topic+is_selected_prediction"),
+    ("T5+topic+gen_best_beam_prediction", "T5cherry+topic+gen_selected_prediction"),
+    ("T5+topic+gen_best_beam_prediction", "T5cherryf+topic+gen_selected_prediction"),
+    ("T5cherry+topic+gen_selected_prediction", "T5cherryf+topic+gen_selected_prediction"),
+    ("T5smooth+topic+specific+generic_best_beam_prediction", "T5cherrysmooth+topic+specific+generic_selected_prediction"),
+    ("T5smooth+topic+specific+generic_best_beam_prediction", "T5cherryfsmooth+topic+specific+generic_selected_prediction"),
+    ("T5cherrysmooth+topic+specific+generic_selected_prediction", "T5cherryfsmooth+topic+specific+generic_selected_prediction"),
+    ("T5smooth+topic+specific+inf_best_beam_prediction", "T5cherrysmooth+topic+specific+inf_selected_prediction"),
+    ("T5smooth+topic+specific+inf_best_beam_prediction", "T5cherryfsmooth+topic+specific+inf_selected_prediction"),
+    ("T5cherrysmooth+topic+specific+inf_selected_prediction", "T5cherryfsmooth+topic+specific+inf_selected_prediction")
 ]
 models_abbreviation: Dict[str, str] = {
     "_random_conclusion": "random",
     "T5_ground_truth": "ground_truth",
-    "T5_best_beam_prediction": "T5",
-    "T5+topic_best_beam_prediction": "T5+top",
-    "T5+topic+is_best_beam_prediction": "T5+top+is",
-    "T5+topic+gen_best_beam_prediction": "T5+top+gen",
-    "T5+topic+inf_best_beam_prediction": "T5+top+inf",
-    "T5+topic+specific+generic_best_beam_prediction": "T5+top+is+gen",
-    "T5+topic+specific+inf_best_beam_prediction": "T5+top+is+inf",
-    "T5+topic+specific+generic+inf_best_beam_prediction": "T5+top+is+gen+inf",
-    "T5smooth_best_beam_prediction": "T5*",
-    "T5smooth+topic_best_beam_prediction": "T5*+top",
-    "T5smooth+topic+is_best_beam_prediction": "T5*+top+is",
-    "T5smooth+topic+gen_best_beam_prediction": "T5*+top+gen",
-    "T5smooth+topic+inf_best_beam_prediction": "T5*+top+inf",
-    "T5smooth+topic+specific+generic_best_beam_prediction": "T5*+top+is+gen",
-    "T5smooth+topic+specific+inf_best_beam_prediction": "T5*+top+is+inf",
-    "T5smooth+topic+specific+generic+inf_best_beam_prediction": "T5*+top+is+gen+inf"
+    "T5_best_beam_prediction": "T5-top",
+    "T5+topic_best_beam_prediction": "T5",
+    "T5+topic+is_best_beam_prediction": "T5+is",
+    "T5+topic+gen_best_beam_prediction": "T5+gen",
+    "T5+topic+inf_best_beam_prediction": "T5+inf",
+    "T5+topic+specific+generic_best_beam_prediction": "T5+is+gen",
+    "T5+topic+specific+inf_best_beam_prediction": "T5+is+inf",
+    "T5+topic+specific+generic+inf_best_beam_prediction": "T5+is+gen+inf",
+    "T5smooth_best_beam_prediction": "T5★-top",
+    "T5smooth+topic_best_beam_prediction": "T5★",
+    "T5cherrysmooth+topic_selected_prediction": "T5★°",
+    "T5smooth+topic+is_best_beam_prediction": "T5★+is",
+    "T5cherrysmooth+topic+is_selected_prediction": "T5★°+is",
+    "T5cherryfsmooth+topic+is_selected_prediction": "T5★°°+is",
+    "T5cherry+topic+gen_selected_prediction": "T5°+gen",
+    "T5cherryf+topic+gen_selected_prediction": "T5°°+gen",
+    "T5smooth+topic+gen_best_beam_prediction": "T5★+gen",
+    "T5smooth+topic+inf_best_beam_prediction": "T5★+inf",
+    "T5smooth+topic+specific+generic_best_beam_prediction": "T5★+is+gen",
+    "T5cherrysmooth+topic+specific+generic_selected_prediction": "T5★°+is+gen",
+    "T5cherryfsmooth+topic+specific+generic_selected_prediction": "T5★°°+is+gen",
+    "T5smooth+topic+specific+inf_best_beam_prediction": "T5★+is+inf",
+    "T5cherrysmooth+topic+specific+inf_selected_prediction": "T5★°+is+inf",
+    "T5cherryfsmooth+topic+specific+inf_selected_prediction": "T5★°°+is+inf",
+    "T5smooth+topic+specific+generic+inf_best_beam_prediction": "T5★+is+gen+inf"
 }
 models_sort: Dict[str, int] = {
     "random": 0,
     "ground_truth": 99,
-    "T5": 10,
-    "T5+top": 20,
-    "T5+top+is": 30,
-    "T5+top+gen": 40,
-    "T5+top+inf": 50,
-    "T5+top+is+gen": 60,
-    "T5+top+is+inf": 70,
-    "T5+top+is+gen+inf": 90,
-    "T5*": 11,
-    "T5*+top": 21,
-    "T5*+top+is": 31,
-    "T5*+top+gen": 41,
-    "T5*+top+inf": 51,
-    "T5*+top+is+gen": 61,
-    "T5*+top+is+inf": 71,
-    "T5*+top+is+gen+inf": 91
+    "T5-top": 10,
+    "T5": 20,
+    "T5+is": 30,
+    "T5+gen": 40,
+    "T5+inf": 50,
+    "T5+is+gen": 60,
+    "T5+is+inf": 70,
+    "T5+is+gen+inf": 90,
+    "T5★-top": 11,
+    "T5°-top": 12,
+    "T5★°-top": 16,
+    "T5★": 21,
+    "T5°": 22,
+    "T5°°": 23,
+    "T5★°": 26,
+    "T5★°°": 27,
+    "T5★+is": 31,
+    "T5°+is": 32,
+    "T5°°+is": 33,
+    "T5★°+is": 36,
+    "T5★°°+is": 37,
+    "T5★+gen": 41,
+    "T5°+gen": 42,
+    "T5°°+gen": 43,
+    "T5★°+gen": 46,
+    "T5★°°+gen": 47,
+    "T5★+inf": 51,
+    "T5°+inf": 52,
+    "T5°°+inf": 53,
+    "T5★°+inf": 56,
+    "T5★°°+inf": 57,
+    "T5★+is+gen": 61,
+    "T5°+is+gen": 62,
+    "T5°°+is+gen": 63,
+    "T5★°+is+gen": 66,
+    "T5★°°+is+gen": 67,
+    "T5★+is+inf": 71,
+    "T5°+is+inf": 72,
+    "T5°°+is+inf": 73,
+    "T5★°+is+inf": 76,
+    "T5★°°+is+inf": 77,
+    "T5★+is+gen+inf": 91,
+    "T5°+is+gen+inf": 92,
+    "T5°°+is+gen+inf": 93,
+    "T5★°+is+gen+inf": 96,
+    "T5★°°+is+gen+inf": 97
 }
 
 stacked_bar_plot: bool = True
@@ -177,7 +243,8 @@ def plot_dict_stacked_bars(d: Dict):
 
     plt.legend(loc="upper left")
     plt.xticks(rotation=15, ha="right")
-    plt.ylim([0, 30])
+    plt.ylim([0, 30] if max(map(lambda c: sum(c), numpy.array(data, dtype=numpy.int).T.tolist())) <= 30 else [0, 60])
+    plt.tight_layout()
     plt.show()
 
 
