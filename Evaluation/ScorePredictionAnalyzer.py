@@ -16,7 +16,7 @@ from const import AVAILABLE_SCORES
 
 predictions_scores_csv: Path = Path(
     "..",
-    ".out/pytorch_lightning/FrameBiasedT5ForConditionalGeneration/128-24/smoothing0.1/tdf0.4/media-frames0.5/t5-large-media-frames/predictions_scores.csv"
+    ".out/pytorch_lightning/T5ForConditionalGeneration/128-24/smoothing0.1/idf0.4/t5-large-res/predictions_scores.csv"
 )
 reference_scores: List[str] = ["rouge1", "rougeL", "bertscore_f1"
                                #, "frameissuespecificscore"

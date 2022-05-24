@@ -97,7 +97,7 @@ loaded_glove_w2v_models: Dict[str, KeyedVectors] = dict()
 def get_glove_w2v_model(path: Optional[Path] = None) -> KeyedVectors:
     if path is None:
         if Path.home().name == "Philipp":
-            glove_path = Path.home().joinpath("Documents", "Einsortiertes", "Nach Lebensabschnitten einsortiert",
+            glove_path = Path.home().joinpath("Documents", "Einsortiertes", "Lebensabschnitte",
                                               "Promotionszeit (2019-2023)", "Promotion", "Programming",
                                               "_wordEmbeddings", "glove", "glove.840B.300d.txt")
             logger.info("Glove-local: {}", glove_path)

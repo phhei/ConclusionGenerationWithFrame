@@ -11,15 +11,21 @@ from MainUtils import retrieve_generic_frame
 
 os.chdir("../")
 
-anchor_path: Optional[str] = ""
-original_framed_cherry_picked: str = ""
-other_framed_cherry_picked: List[str] = []
+anchor_path: Optional[str] = ".out/pytorch_lightning/FrameBiasedT5ForConditionalGeneration/140-24/smoothing0.1/tdf0.4/media-frames0.5/t5-large-topic-isinf-frame"
+original_framed_cherry_picked: str = ".out/pytorch_lightning/FrameBiasedT5ForConditionalGeneration/140-24/smoothing0.1/tdf0.4/media-frames0.5/t5-large-topic-isinf-frame/predictions_scores_cherry_picker/rouge1-rougeL-bertscore_f1/linear_regression/cherry_picked_without-rougebertscore_precisionbertscore_recallbertscore_f1.csv"
+other_framed_cherry_picked: List[str] = [
+    ".out/pytorch_lightning/FrameBiasedT5ForConditionalGeneration/140-24/smoothing0.1/tdf0.4/media-frames0.5/t5-large-topic-isinf-frame/predictions_scores_Crime-and-punishment_cherry_picker/rouge1-rougeL-bertscore_f1/linear_regression/cherry_picked_without-rougebertscore_precisionbertscore_recallbertscore_f1.csv",
+    ".out/pytorch_lightning/FrameBiasedT5ForConditionalGeneration/140-24/smoothing0.1/tdf0.4/media-frames0.5/t5-large-topic-isinf-frame/predictions_scores_Economic_cherry_picker/rouge1-rougeL-bertscore_f1/linear_regression/cherry_picked_without-rougebertscore_precisionbertscore_recallbertscore_f1.csv",
+    ".out/pytorch_lightning/FrameBiasedT5ForConditionalGeneration/140-24/smoothing0.1/tdf0.4/media-frames0.5/t5-large-topic-isinf-frame/predictions_scores_Legality-constitutionality-and-jurisprudence_cherry_picker/rouge1-rougeL-bertscore_f1/linear_regression/cherry_picked_without-rougebertscore_precisionbertscore_recallbertscore_f1.csv",
+    ".out/pytorch_lightning/FrameBiasedT5ForConditionalGeneration/140-24/smoothing0.1/tdf0.4/media-frames0.5/t5-large-topic-isinf-frame/predictions_scores_Policy-prescription-and-evaluation_cherry_picker/rouge1-rougeL-bertscore_f1/linear_regression/cherry_picked_without-rougebertscore_precisionbertscore_recallbertscore_f1.csv",
+    ".out/pytorch_lightning/FrameBiasedT5ForConditionalGeneration/140-24/smoothing0.1/tdf0.4/media-frames0.5/t5-large-topic-isinf-frame/predictions_scores_Political_cherry_picker/rouge1-rougeL-bertscore_f1/linear_regression/cherry_picked_without-rougebertscore_precisionbertscore_recallbertscore_f1.csv"
+]
 
-original_frame_set: Optional[FrameSet] = FrameSet(frame_set="media_frames", add_other=True)
+original_frame_set: Optional[FrameSet] = FrameSet(frame_set="frequent_media_frames", add_other=True)
 alternative_frame_set: Optional[FrameSet] = FrameSet(frame_set="frequent_media_frames", add_other=False)
 
 include_original_frame: bool = True
-include_other: bool = True
+include_other: bool = False
 exclude_unfitting_original_samples: bool = True
 exclude_unfitting_modified_samples: bool = True
 

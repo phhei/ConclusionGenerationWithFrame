@@ -1,7 +1,7 @@
 <?php
     require "password.php";
 
-    $annotation_round = ($_GET and array_key_exists("additional_args", $_GET)) ? "(36, 37, 38)" : "(31, 32, 33, 34, 35)";
+    $annotation_round = ($_GET and array_key_exists("additional_args", $_GET)) ? "(101)" : "(100, 101)";
 
     if($_POST and array_key_exists("annotator_ID", $_GET)) {
         $conn_db = new mysqli("localhost", "philipp", $db_password, "philipp_umfrage");
